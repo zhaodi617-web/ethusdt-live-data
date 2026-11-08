@@ -54,6 +54,91 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python3 telegram_alert.py
 
+      - name: Send new Observer verification results
+        continue-on-error: true
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import subprocess
+          import urllib.parse
+          import urllib.request
+          from datetime import datetime, timezone
+
+          diff = subprocess.run(
+              ['git', 'diff', '--unified=0', '--', 'observer_verifications.jsonl'],
+              capture_output=True,
+              text=True,
+              check=True
+          ).stdout
+
+          records = []
+
+          for line in diff.splitlines():
+              if line.startswith('+') and not line.startswith('+++'):
+                  try:
+                      record = json.loads(line[1:])
+                  except json.JSONDecodeError:
+                      continue
+
+                  if record.get('result') in ('HIT', 'MISS', 'FLAT'):
+                      records.append(record)
+
+          if not records:
+              print('No newly verified directional results')
+          else:
+              token = os.environ['TELEGRAM_BOT_TOKEN']
+              chat_id = os.environ['TELEGRAM_CHAT_ID']
+
+              for r in records:
+                  ts = datetime.fromtimestamp(
+                      r['prediction_time'] / 1000,
+                      timezone.utc
+                  ).strftime('%Y-%m-%d %H:%M UTC')
+
+                  message = (
+                      'Observer Ladder ETH - Verification\n\n'
+                      f"Result: {r['result']}\n"
+                      f"Signal: {r['signal']}\n"
+                      f"Prediction: {ts}\n"
+                      f"Reference: {r['reference_price']} USDT\n"
+                      f"Verified: {r['verification_price']} USDT\n"
+                      f"Price change: {r['return_pct']:+.3f}%\n\n"
+                      'Direction test only, not trading P&L.'
+                  )
+
+                  data = urllib.parse.urlencode({
+                      'chat_id': chat_id,
+                      'text': message
+                  }).encode()
+
+                  request = urllib.request.Request(
+                      f'https://api.telegram.org/bot{token}/sendMessage',
+                      data=data,
+                      method='POST'
+                  )
+
+                  with urllib.request.urlopen(
+                      request,
+                      timeout=20
+                  ) as response:
+                      result = json.load(response)
+
+                  if not result.get('ok'):
+                      raise RuntimeError(
+                          'Telegram result delivery failed'
+                      )
+
+                  print(
+                      'Verification sent:',
+                      r['prediction_time'],
+                      r['result']
+                  )
+          PY
+
       - name: Generate Observer V2 paper analysis
         continue-on-error: true
         run: python3 observer_v2.py
