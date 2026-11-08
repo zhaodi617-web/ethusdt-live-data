@@ -47,6 +47,13 @@ jobs:
       - name: Verify Observer predictions
         run: python3 verify_observer.py
 
+      - name: Send Telegram early alert
+        continue-on-error: true
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python3 telegram_alert.py
+
       - name: Commit market data and predictions
         run: |
           git config user.name "github-actions[bot]"
@@ -64,7 +71,8 @@ jobs:
             observer_early_predictions.jsonl \
             observer_early_latest.json \
             observer_verifications.jsonl \
-            observer_accuracy.json
+            observer_accuracy.json \
+            telegram_last_sent.json
           do
             if [ -f "$file" ]; then
               git add "$file"
@@ -72,7 +80,7 @@ jobs:
           done
 
           if ! git diff --cached --quiet; then
-            git commit -m "Update ETH predictions and verification"
+            git commit -m "Update ETH data and Telegram alerts"
             git pull --rebase origin main
             git push origin main
           fi
