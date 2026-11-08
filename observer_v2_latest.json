@@ -1,0 +1,38 @@
+{
+  "model": "observer_ladder_v2_paper_v0",
+  "market": "OKX ETH-USDT-SWAP",
+  "observation_id": "1794173400000",
+  "generated_at_utc": "2026-11-08T21:51:24.443000+00:00",
+  "reference_candle_close_time": 1794174300000,
+  "status": "PAPER_SETUP",
+  "direction": "DOWN",
+  "last_confirmed_15m_close": 2221.01,
+  "latest_ticker_price": 2194.24,
+  "prior_structure_low": 2221.5,
+  "prior_structure_high": 2233.91,
+  "volume_ratio": 1.3204,
+  "h1_momentum_3h": -0.001749,
+  "oi_usd_snapshot": "1542926564.6697038637984",
+  "funding_rate_snapshot": "-0.0000241507806796",
+  "paper_entry_at_closed_candle": 2221.01,
+  "paper_invalidation_level": 2233.91,
+  "paper_target_1_5R": 2201.66,
+  "paper_risk_distance_pct": 0.5808,
+  "reasons": [
+    "15m close broke prior 8-bar low",
+    "15m volume >= 1.2x prior average",
+    "independent 1h trend downward"
+  ],
+  "counterevidence": [],
+  "not_used_for_confirmation": [
+    "OI delta unavailable without aligned snapshots",
+    "funding is descriptive, not a trading trigger"
+  ],
+  "assumptions": [
+    "1.2x volume and 0.1% 1h thresholds are unvalidated hypotheses",
+    "paper entry assumes filled at the confirmed candle close",
+    "fees/slippage/funding not yet modeled"
+  ],
+  "simulation_only": true,
+  "live_order_allowed": false
+}
