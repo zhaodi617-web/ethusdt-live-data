@@ -33,11 +33,14 @@ jobs:
       - name: Record derivatives history
         run: python3 record_derivatives.py
 
-      - name: Generate ETH prediction
+      - name: Generate baseline prediction
         run: python3 predict_eth.py
 
-      - name: Verify ETH predictions
+      - name: Verify baseline predictions
         run: python3 verify_eth.py
+
+      - name: Generate Observer early warning
+        run: python3 observer_early.py
 
       - name: Commit latest data
         run: |
@@ -55,7 +58,16 @@ jobs:
             git add eth_verifications.jsonl
           fi
 
+          if [ -f observer_early_predictions.jsonl ]; then
+            git add observer_early_predictions.jsonl
+          fi
+
+          if [ -f observer_early_latest.json ]; then
+            git add observer_early_latest.json
+          fi
+
           if ! git diff --cached --quiet; then
-            git commit -m "Update OKX ETH market data and history"
-            git push
+            git commit -m "Update ETH data and Observer predictions"
+            git pull --rebase origin main
+            git push origin main
           fi
