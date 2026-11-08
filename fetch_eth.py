@@ -1,4 +1,7 @@
+
 import json
+import urllib.error
+
 import urllib.request
 from datetime import datetime, timezone
 
@@ -9,8 +12,16 @@ request = urllib.request.Request(
     headers={"User-Agent": "ETHUSDT-Data-Collector/1.0"}
 )
 
-with urllib.request.urlopen(request, timeout=15) as response:
-    ticker = json.load(response)
+try:
+    with urllib.request.urlopen(request, timeout=15) as response:
+        ticker = json.load(response)
+except urllib.error.HTTPError as error:
+    if error.code == 451:
+        raise SystemExit(
+            "Binance API access restricted (HTTP 451). "
+            "No new market data saved."
+        )
+    raise
 
 data = {
     "symbol": ticker["symbol"],
