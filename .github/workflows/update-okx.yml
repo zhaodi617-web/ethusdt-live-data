@@ -16,6 +16,7 @@ jobs:
   update:
     runs-on: ubuntu-latest
     timeout-minutes: 3
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -29,15 +30,22 @@ jobs:
       - name: Generate ETH prediction
         run: python3 predict_eth.py
 
+      - name: Verify ETH predictions
+        run: python3 verify_eth.py
+
       - name: Commit latest data
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
           git add okx_latest.json okx_candles.json
-          if [ -f eth_predictions.jsonl ]; then
-            git add eth_predictions.jsonl
+          git add eth_predictions.jsonl eth_accuracy.json
+
+          if [ -f eth_verifications.jsonl ]; then
+            git add eth_verifications.jsonl
           fi
+
           if ! git diff --cached --quiet; then
-            git commit -m "Update OKX ETH data and predictions"
+            git commit -m "Update OKX ETH data and verification"
             git push
           fi
