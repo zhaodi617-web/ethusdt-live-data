@@ -54,6 +54,10 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python3 telegram_alert.py
 
+      - name: Generate Observer V2 paper analysis
+        continue-on-error: true
+        run: python3 observer_v2.py
+
       - name: Commit market data and predictions
         run: |
           git config user.name "github-actions[bot]"
@@ -72,7 +76,9 @@ jobs:
             observer_early_latest.json \
             observer_verifications.jsonl \
             observer_accuracy.json \
-            telegram_last_sent.json
+            telegram_last_sent.json \
+            observer_v2_latest.json \
+            observer_v2_observations.jsonl
           do
             if [ -f "$file" ]; then
               git add "$file"
@@ -80,7 +86,7 @@ jobs:
           done
 
           if ! git diff --cached --quiet; then
-            git commit -m "Update ETH data and Telegram alerts"
+            git commit -m "Update ETH data and Observer V2"
             git pull --rebase origin main
             git push origin main
           fi
