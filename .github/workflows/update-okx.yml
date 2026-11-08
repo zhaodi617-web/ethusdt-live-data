@@ -2,7 +2,7 @@ name: Update OKX ETH Price
 
 on:
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: '2-59/5 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -25,15 +25,19 @@ jobs:
 
       - name: Fetch OKX candles
         run: python3 fetch_candles.py
+
       - name: Generate ETH prediction
-       run: python3 predict_eth.py
+        run: python3 predict_eth.py
+
       - name: Commit latest data
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add okx_latest.json okx_candles.json
-
+          if [ -f eth_predictions.jsonl ]; then
+            git add eth_predictions.jsonl
+          fi
           if ! git diff --cached --quiet; then
-            git commit -m "Update OKX ETH data"
+            git commit -m "Update OKX ETH data and predictions"
             git push
           fi
