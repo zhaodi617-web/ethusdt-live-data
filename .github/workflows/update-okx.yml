@@ -30,6 +30,9 @@ jobs:
       - name: Fetch derivatives data
         run: python3 fetch_derivatives.py
 
+      - name: Record derivatives history
+        run: python3 record_derivatives.py
+
       - name: Generate ETH prediction
         run: python3 predict_eth.py
 
@@ -44,6 +47,7 @@ jobs:
           git add okx_latest.json
           git add okx_candles.json
           git add okx_derivatives.json
+          git add okx_derivatives_history.jsonl
           git add eth_predictions.jsonl
           git add eth_accuracy.json
 
@@ -52,6 +56,6 @@ jobs:
           fi
 
           if ! git diff --cached --quiet; then
-            git commit -m "Update OKX ETH market data"
+            git commit -m "Update OKX ETH market data and history"
             git push
           fi
