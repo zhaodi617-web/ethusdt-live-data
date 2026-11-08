@@ -15,11 +15,13 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 5
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: true
 
       - name: Fetch OKX ETH price
         run: python3 fetch_okx.py
@@ -42,7 +44,10 @@ jobs:
       - name: Generate Observer early warning
         run: python3 observer_early.py
 
-      - name: Commit latest data
+      - name: Verify Observer predictions
+        run: python3 verify_observer.py
+
+      - name: Commit market data and predictions
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -54,20 +59,20 @@ jobs:
           git add eth_predictions.jsonl
           git add eth_accuracy.json
 
-          if [ -f eth_verifications.jsonl ]; then
-            git add eth_verifications.jsonl
-          fi
-
-          if [ -f observer_early_predictions.jsonl ]; then
-            git add observer_early_predictions.jsonl
-          fi
-
-          if [ -f observer_early_latest.json ]; then
-            git add observer_early_latest.json
-          fi
+          for file in \
+            eth_verifications.jsonl \
+            observer_early_predictions.jsonl \
+            observer_early_latest.json \
+            observer_verifications.jsonl \
+            observer_accuracy.json
+          do
+            if [ -f "$file" ]; then
+              git add "$file"
+            fi
+          done
 
           if ! git diff --cached --quiet; then
-            git commit -m "Update ETH data and Observer predictions"
+            git commit -m "Update ETH predictions and verification"
             git pull --rebase origin main
             git push origin main
           fi
