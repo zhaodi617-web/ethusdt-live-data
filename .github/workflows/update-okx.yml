@@ -93,6 +93,17 @@ jobs:
               token = os.environ['TELEGRAM_BOT_TOKEN']
               chat_id = os.environ['TELEGRAM_CHAT_ID']
 
+              labels = {
+                  'HIT': '预测正确 HIT',
+                  'MISS': '预测错误 MISS',
+                  'FLAT': '价格变化较小 FLAT'
+              }
+
+              directions = {
+                  'EARLY_UP': '偏上涨 EARLY_UP',
+                  'EARLY_DOWN': '偏下跌 EARLY_DOWN'
+              }
+
               for r in records:
                   prediction_id = str(r['prediction_time'])
 
@@ -106,23 +117,31 @@ jobs:
                       timezone.utc
                   ).strftime('%Y-%m-%d %H:%M:%S UTC')
 
+                  result_label = labels.get(
+                      r['result'], r['result']
+                  )
+                  direction_label = directions.get(
+                      r['signal'], r['signal']
+                  )
+
                   message = (
-                      'Observer Ladder ETH - Verification\n\n'
-                      f"Prediction ID: {prediction_id}\n"
-                      f"Prediction Time: {prediction_time}\n"
-                      f"Verification Time: {verification_time}\n\n"
-                      f"Result: {r['result']}\n"
-                      f"Signal: {r['signal']}\n"
-                      f"Reference: {r['reference_price']} USDT\n"
-                      f"Verified: {r['verification_price']} USDT\n"
-                      f"Price change: {r['return_pct']:+.3f}%\n\n"
-                      'Direction test only, not trading P&L.'
+                      '【Observer Ladder ETH｜预测验证】\n\n'
+                      f"预测编号：{prediction_id}\n"
+                      f"预测时间：{prediction_time}\n"
+                      f"验证时间：{verification_time}\n\n"
+                      f"验证结果：{result_label}\n"
+                      f"原预测方向：{direction_label}\n"
+                      f"原参考价格：{r['reference_price']} USDT\n"
+                      f"实际验证价格：{r['verification_price']} USDT\n"
+                      f"实际价格变化：{r['return_pct']:+.3f}%\n\n"
+                      '说明：仅验证价格方向，'
+                      '不代表真实交易盈亏。'
                   )
 
                   data = urllib.parse.urlencode({
                       'chat_id': chat_id,
                       'text': message
-                  }).encode()
+                  }).encode('utf-8')
 
                   request = urllib.request.Request(
                       f'https://api.telegram.org/bot{token}/sendMessage',
@@ -131,8 +150,7 @@ jobs:
                   )
 
                   with urllib.request.urlopen(
-                      request,
-                      timeout=20
+                      request, timeout=20
                   ) as response:
                       result = json.load(response)
 
