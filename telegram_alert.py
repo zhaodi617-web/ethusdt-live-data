@@ -19,16 +19,14 @@ if not token or not chat_id:
 
 def send(message):
     url = f"https://api.telegram.org/bot{token}/sendMessage"
-
-    payload = urllib.parse.urlencode({
+    data = urllib.parse.urlencode({
         "chat_id": chat_id,
         "text": message
     }).encode("utf-8")
 
     request = urllib.request.Request(
-        url, data=payload, method="POST"
+        url, data=data, method="POST"
     )
-
     with urllib.request.urlopen(
         request, timeout=20
     ) as response:
@@ -38,13 +36,28 @@ def send(message):
         raise RuntimeError("Telegram send failed")
 
 
+def chinese_reason(value):
+    translations = {
+        "15m upward momentum": "15分钟动量向上",
+        "15m downward momentum": "15分钟动量向下",
+        "1h upward momentum": "1小时动量向上",
+        "1h downward momentum": "1小时动量向下",
+        "OI and price rising": "持仓量与价格同步上升",
+        "OI rising with falling price": "持仓量上升、价格下降",
+        "Weak recent volume": "近期成交量偏弱",
+        "Timeframes disagree": "不同周期方向不一致",
+        "Funding data unavailable": "资金费率数据缺失"
+    }
+    return translations.get(value, value)
+
+
 if "--test" in sys.argv:
     send(
         "Observer Ladder ETH\n\n"
-        "Telegram connection test successful.\n"
-        "This is not a trading signal."
+        "中文通知测试成功。\n"
+        "这是一条测试消息，不是交易信号。"
     )
-    print("Telegram test sent")
+    print("Telegram Chinese test sent")
     sys.exit(0)
 
 
@@ -73,16 +86,14 @@ if SENT.exists():
     previous = json.loads(
         SENT.read_text(encoding="utf-8")
     )
-
     if previous.get("prediction_id") == prediction_id:
         print("Alert already sent")
         sys.exit(0)
 
-
 direction = (
-    "EARLY_UP - Potential upside"
+    "偏上涨 EARLY_UP"
     if signal == "EARLY_UP"
-    else "EARLY_DOWN - Potential downside"
+    else "偏下跌 EARLY_DOWN"
 )
 
 prediction_time = datetime.fromtimestamp(
@@ -90,27 +101,30 @@ prediction_time = datetime.fromtimestamp(
     timezone.utc
 ).strftime("%Y-%m-%d %H:%M:%S UTC")
 
-reasons = ", ".join(
-    prediction.get("reasons", [])
-) or "Not available"
+reasons = "、".join(
+    chinese_reason(x)
+    for x in prediction.get("reasons", [])
+) or "暂无"
 
-counter = ", ".join(
-    prediction.get("counterevidence", [])
-) or "None recorded"
+counter = "、".join(
+    chinese_reason(x)
+    for x in prediction.get("counterevidence", [])
+) or "暂无记录"
 
 message = (
-    "Observer Ladder ETH Alert\n\n"
-    f"Prediction ID: {prediction_id}\n"
-    f"Prediction Time: {prediction_time}\n\n"
-    f"Signal: {direction}\n"
-    f"Reference: {prediction['reference_price']} USDT\n"
-    f"Score: {prediction['score']}\n"
-    f"Support: {prediction['support']}\n"
-    f"Resistance: {prediction['resistance']}\n"
-    f"Evidence: {reasons}\n"
-    f"Counterevidence: {counter}\n"
-    "Horizon: 60 minutes\n\n"
-    "Research alert only. Not an order."
+    "【Observer Ladder ETH｜方向预警】\n\n"
+    f"预测编号：{prediction_id}\n"
+    f"预测时间：{prediction_time}\n\n"
+    f"预测方向：{direction}\n"
+    f"参考价格：{prediction['reference_price']} USDT\n"
+    f"模型评分：{prediction['score']}\n"
+    f"参考支撑：{prediction['support']} USDT\n"
+    f"参考阻力：{prediction['resistance']} USDT\n"
+    f"支持依据：{reasons}\n"
+    f"反向证据：{counter}\n"
+    "预测期限：未来60分钟\n\n"
+    "注意：仅为研究预警，"
+    "不是实盘买卖指令。"
 )
 
 send(message)
