@@ -94,16 +94,25 @@ jobs:
               chat_id = os.environ['TELEGRAM_CHAT_ID']
 
               for r in records:
-                  ts = datetime.fromtimestamp(
+                  prediction_id = str(r['prediction_time'])
+
+                  prediction_time = datetime.fromtimestamp(
                       r['prediction_time'] / 1000,
                       timezone.utc
-                  ).strftime('%Y-%m-%d %H:%M UTC')
+                  ).strftime('%Y-%m-%d %H:%M:%S UTC')
+
+                  verification_time = datetime.fromtimestamp(
+                      r['verification_time'] / 1000,
+                      timezone.utc
+                  ).strftime('%Y-%m-%d %H:%M:%S UTC')
 
                   message = (
                       'Observer Ladder ETH - Verification\n\n'
+                      f"Prediction ID: {prediction_id}\n"
+                      f"Prediction Time: {prediction_time}\n"
+                      f"Verification Time: {verification_time}\n\n"
                       f"Result: {r['result']}\n"
                       f"Signal: {r['signal']}\n"
-                      f"Prediction: {ts}\n"
                       f"Reference: {r['reference_price']} USDT\n"
                       f"Verified: {r['verification_price']} USDT\n"
                       f"Price change: {r['return_pct']:+.3f}%\n\n"
@@ -134,7 +143,7 @@ jobs:
 
                   print(
                       'Verification sent:',
-                      r['prediction_time'],
+                      prediction_id,
                       r['result']
                   )
           PY
