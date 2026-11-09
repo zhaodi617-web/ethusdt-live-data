@@ -1,52 +1,8 @@
 {
   "exchange": "OKX",
   "symbol": "ETH-USDT-SWAP",
-  "collected_at": "2026-11-09T01:37:54.855388+00:00",
+  "collected_at": "2026-11-09T02:31:45.322133+00:00",
   "candles_15m": [
-    {
-      "time": 1794098700000,
-      "open": "2234.8",
-      "high": "2236.16",
-      "low": "2234.09",
-      "close": "2235.69",
-      "volume_contracts": "34398.44",
-      "volume_eth": "3439.844",
-      "volume_usdt": "7687695.50062",
-      "confirmed": true
-    },
-    {
-      "time": 1794099600000,
-      "open": "2235.69",
-      "high": "2236.97",
-      "low": "2235",
-      "close": "2235.79",
-      "volume_contracts": "24950.9",
-      "volume_eth": "2495.09",
-      "volume_usdt": "5578744.32717",
-      "confirmed": true
-    },
-    {
-      "time": 1794100500000,
-      "open": "2235.79",
-      "high": "2235.8",
-      "low": "2232.69",
-      "close": "2233.52",
-      "volume_contracts": "29855.04",
-      "volume_eth": "2985.504",
-      "volume_usdt": "6668928.4508",
-      "confirmed": true
-    },
-    {
-      "time": 1794101400000,
-      "open": "2233.52",
-      "high": "2235.82",
-      "low": "2233.12",
-      "close": "2234.48",
-      "volume_contracts": "39411.55",
-      "volume_eth": "3941.155",
-      "volume_usdt": "8807854.47596",
-      "confirmed": true
-    },
     {
       "time": 1794102300000,
       "open": "2234.47",
@@ -1095,27 +1051,60 @@
     {
       "time": 1794187800000,
       "open": "2125.29",
-      "high": "2134",
+      "high": "2142.67",
       "low": "2123.75",
-      "close": "2129.52",
-      "volume_contracts": "182125.61",
-      "volume_eth": "18212.561",
-      "volume_usdt": "38782692.19164",
+      "close": "2142.43",
+      "volume_contracts": "321347.3",
+      "volume_eth": "32134.73",
+      "volume_usdt": "68541897.6058",
+      "confirmed": true
+    },
+    {
+      "time": 1794188700000,
+      "open": "2142.44",
+      "high": "2147",
+      "low": "2138.9",
+      "close": "2141.16",
+      "volume_contracts": "322734.86",
+      "volume_eth": "32273.486",
+      "volume_usdt": "69159879.14691",
+      "confirmed": true
+    },
+    {
+      "time": 1794189600000,
+      "open": "2141.15",
+      "high": "2148.42",
+      "low": "2139.19",
+      "close": "2144.64",
+      "volume_contracts": "177725.42",
+      "volume_eth": "17772.542",
+      "volume_usdt": "38105141.9923",
+      "confirmed": true
+    },
+    {
+      "time": 1794190500000,
+      "open": "2144.63",
+      "high": "2156.87",
+      "low": "2143.26",
+      "close": "2154.78",
+      "volume_contracts": "415177.79",
+      "volume_eth": "41517.779",
+      "volume_usdt": "89335500.97464",
+      "confirmed": true
+    },
+    {
+      "time": 1794191400000,
+      "open": "2154.79",
+      "high": "2155.71",
+      "low": "2152.01",
+      "close": "2152.68",
+      "volume_contracts": "46511.92",
+      "volume_eth": "4651.192",
+      "volume_usdt": "10015525.96833",
       "confirmed": false
     }
   ],
   "candles_1h": [
-    {
-      "time": 1793829600000,
-      "open": "2417.22",
-      "high": "2444.37",
-      "low": "2416.45",
-      "close": "2435.26",
-      "volume_contracts": "1004218.22",
-      "volume_eth": "100421.822",
-      "volume_usdt": "244584794.02554",
-      "confirmed": true
-    },
     {
       "time": 1793833200000,
       "open": "2435.26",
@@ -2199,10 +2188,21 @@
       "open": "2143.45",
       "high": "2151.04",
       "low": "2123.56",
-      "close": "2129.53",
-      "volume_contracts": "1062177.56",
-      "volume_eth": "106217.756",
-      "volume_usdt": "226893091.02808",
+      "close": "2141.16",
+      "volume_contracts": "1523793.24",
+      "volume_eth": "152379.324",
+      "volume_usdt": "325739586.30104",
+      "confirmed": true
+    },
+    {
+      "time": 1794189600000,
+      "open": "2141.15",
+      "high": "2156.87",
+      "low": "2139.19",
+      "close": "2152.68",
+      "volume_contracts": "639415.13",
+      "volume_eth": "63941.513",
+      "volume_usdt": "137456168.93527",
       "confirmed": false
     }
   ]
