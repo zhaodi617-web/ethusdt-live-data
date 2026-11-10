@@ -1,0 +1,46 @@
+name: Observer Ladder Event Risk Alerts
+
+on:
+  workflow_run:
+    workflows: ["Update OKX ETH Price"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: observer-event-alert
+  cancel-in-progress: false
+
+jobs:
+  event-risk-alert:
+    # Run after data workflow finishes, but not if it was cancelled/failed.
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+      - name: Unit test event risk alerts
+        run: python3 -m unittest -q test_event_risk_alert.py
+      - name: Send upcoming event risk alerts
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python3 event_risk_alert.py
+      - name: Persist sent-alert dedup state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -f event_alert_sent.json ]; then
+            git add event_alert_sent.json
+            if ! git diff --cached --quiet; then
+              git commit -m "Record sent event-risk alerts"
+              git pull --rebase origin main
+              git push origin main
+            fi
+          fi
