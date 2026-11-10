@@ -1,0 +1,44 @@
+name: Observer Ladder V1 Plus Event Overlay
+
+on:
+  workflow_run:
+    workflows: ["Update OKX ETH Price"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: observer-v1-plus-event-overlay
+  cancel-in-progress: false
+
+jobs:
+  event-overlay:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+      - name: Verify V1+ event overlay
+        run: python3 -m unittest -q test_observer_v1_plus.py
+      - name: Evaluate V1+ using latest V1 and event calendar
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python3 observer_v1_plus.py
+      - name: Persist V1+ shadow observations
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add observer_v1_plus_latest.json observer_v1_plus_history.jsonl
+          if [ -f observer_v1_plus_sent.json ]; then git add observer_v1_plus_sent.json; fi
+          if ! git diff --cached --quiet; then
+            git commit -m "Record Observer V1+ event overlay"
+            git pull --rebase origin main
+            git push origin main
+          fi
