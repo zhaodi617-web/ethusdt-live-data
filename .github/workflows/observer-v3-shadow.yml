@@ -1,0 +1,49 @@
+name: Observer Ladder V3 Shadow Research
+
+on:
+  workflow_run:
+    workflows: ["Update OKX ETH Price"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: observer-v3-shadow-research
+  cancel-in-progress: false
+
+jobs:
+  observe:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout current data
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+
+      - name: Unit-test isolated V3 research logic
+        run: python3 -m unittest -q test_v3_shadow.py
+
+      - name: Generate forward-only shadow observation and candle archive
+        run: python3 v3_shadow.py
+
+      - name: Persist V3-only files (never modify V1 outputs)
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add v3_shadow_latest.json v3_shadow_history.jsonl \
+            v3_archive_15m.jsonl v3_archive_1h.jsonl
+          if ! git diff --cached --quiet; then
+            git commit -m "Archive confirmed ETH candles and V3 paper-only research"
+            git pull --rebase origin main
+            git push origin main
+          else
+            echo "No new V3 research records"
+          fi
