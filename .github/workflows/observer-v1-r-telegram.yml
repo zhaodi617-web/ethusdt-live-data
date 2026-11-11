@@ -1,0 +1,48 @@
+name: Observer V1-R Significant Disagreement Telegram
+
+on:
+  workflow_run:
+    workflows: ["Observer Ladder V1-R Independent Multi-Horizon Research"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: observer-v1-r-telegram
+  cancel-in-progress: false
+
+jobs:
+  alert:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Read current V1 and V1-R outputs
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+      - name: Verify strict disagreement alert rules
+        run: python3 -m unittest -q test_v1_r_telegram.py
+      - name: Send Chinese message only for important new disagreement
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python3 v1_r_telegram.py
+      - name: Save only deduplication state
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f v1_r_telegram_state.json ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add v1_r_telegram_state.json
+            if ! git diff --cached --quiet; then
+              git commit -m "Record V1-R Telegram disagreement notification"
+              git pull --rebase origin main
+              git push origin main
+            fi
+          fi
