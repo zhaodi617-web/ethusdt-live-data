@@ -1,0 +1,51 @@
+name: Observer Ladder V3 Candidate Telegram Alerts
+
+on:
+  workflow_run:
+    workflows: ["Observer Ladder V3 Shadow Research"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: observer-v3-candidate-alerts
+  cancel-in-progress: false
+
+jobs:
+  alert:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout main after V3 research run
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+      - name: Test Telegram and forward-only verification logic
+        run: python3 -m unittest -q test_v3_alert_verify.py
+      - name: Process new candidate or observed trigger
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python3 v3_alert_verify.py
+      - name: Commit ONLY V3 candidate records
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add v3_alert_latest.json v3_quote_observations.jsonl
+          for file in v3_alert_state.json v3_alert_results.jsonl; do
+            if [ -f "$file" ]; then git add "$file"; fi
+          done
+          if ! git diff --cached --quiet; then
+            git commit -m "Record V3 candidate alerts and observed quote checks"
+            git pull --rebase origin main
+            git push origin main
+          else
+            echo "No new V3 notification records"
+          fi
