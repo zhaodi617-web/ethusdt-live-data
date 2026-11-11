@@ -1,0 +1,67 @@
+{
+  "model": "observer_v1_r_shadow_v0",
+  "prediction_time_ms": 1794377712779,
+  "prediction_time_utc": "2026-11-11T06:15:12.779000+00:00",
+  "market": "OKX ETH-USDT-SWAP",
+  "reference_price": 2067.53,
+  "features": {
+    "short_15m": 0.00058023,
+    "historical_nonoverlap_3h": 0.0053687,
+    "volume_ratio": 1.24795,
+    "breakout_up": false,
+    "breakout_down": false,
+    "prior_structure_high": 2071.36,
+    "prior_structure_low": 2056.15,
+    "context": "UPTREND_CONTINUATION_HYPOTHESIS",
+    "reference_price": 2067.53,
+    "quote_time_ms": 1794377450963,
+    "latest_closed_bar_end_ms": 1794376800000,
+    "hourly_background_last_end_ms": 1794373200000
+  },
+  "predictions": [
+    {
+      "horizon_minutes": 15,
+      "target_time_ms": 1794378612779,
+      "direction": "UP",
+      "uncalibrated_score": 0.000553662,
+      "weak_volume": false,
+      "countertrend": false,
+      "weight_short": 0.8,
+      "weight_background": 0.2
+    },
+    {
+      "horizon_minutes": 30,
+      "target_time_ms": 1794379512779,
+      "direction": "UP",
+      "uncalibrated_score": 0.000533737,
+      "weak_volume": false,
+      "countertrend": false,
+      "weight_short": 0.65,
+      "weight_background": 0.35
+    },
+    {
+      "horizon_minutes": 45,
+      "target_time_ms": 1794380412779,
+      "direction": "UP",
+      "uncalibrated_score": 0.000507169,
+      "weak_volume": false,
+      "countertrend": false,
+      "weight_short": 0.45,
+      "weight_background": 0.55
+    },
+    {
+      "horizon_minutes": 60,
+      "target_time_ms": 1794381312779,
+      "direction": "UP",
+      "uncalibrated_score": 0.000487243,
+      "weak_volume": false,
+      "countertrend": false,
+      "weight_short": 0.3,
+      "weight_background": 0.7
+    }
+  ],
+  "uncalibrated": true,
+  "simulation_only": true,
+  "live_order_allowed": false,
+  "note": "Shadow hypothesis, not a buy/sell signal; no proof of positive trading expectancy"
+}
