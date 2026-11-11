@@ -1,0 +1,46 @@
+name: Observer Ladder V1-R Independent Multi-Horizon Research
+
+on:
+  workflow_run:
+    workflows: ["Update OKX ETH Price"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: observer-v1-r-research
+  cancel-in-progress: false
+
+jobs:
+  research:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+      - name: Test independent V1-R
+        run: python3 -m unittest -q test_observer_v1_r.py
+      - name: Generate forward-only predictions and verify prior horizons
+        run: python3 observer_v1_r.py
+      - name: Persist ONLY V1-R research outputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add v1_r_predictions.jsonl v1_r_latest.json v1_r_summary.json
+          if [ -f v1_r_verifications.jsonl ]; then git add v1_r_verifications.jsonl; fi
+          if ! git diff --cached --quiet; then
+            git commit -m "Record independent V1-R multi-horizon research"
+            git pull --rebase origin main
+            git push origin main
+          else
+            echo "No new V1-R data"
+          fi
