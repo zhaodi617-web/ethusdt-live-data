@@ -1,19 +1,8 @@
 {
   "exchange": "OKX",
   "symbol": "ETH-USDT-SWAP",
-  "collected_at": "2026-11-12T03:40:51.210116+00:00",
+  "collected_at": "2026-11-12T03:45:51.899363+00:00",
   "candles_15m": [
-    {
-      "time": 1794365100000,
-      "open": "2061.08",
-      "high": "2062",
-      "low": "2056.26",
-      "close": "2057.69",
-      "volume_contracts": "169007.67",
-      "volume_eth": "16900.767",
-      "volume_usdt": "34800987.64177",
-      "confirmed": true
-    },
     {
       "time": 1794366000000,
       "open": "2057.7",
@@ -1096,11 +1085,22 @@
       "time": 1794454200000,
       "open": "2054.56",
       "high": "2056",
-      "low": "2051.7",
-      "close": "2052.65",
-      "volume_contracts": "46453.11",
-      "volume_eth": "4645.311",
-      "volume_usdt": "9539461.77896",
+      "low": "2051",
+      "close": "2052.3",
+      "volume_contracts": "74301.03",
+      "volume_eth": "7430.103",
+      "volume_usdt": "15254372.97885",
+      "confirmed": true
+    },
+    {
+      "time": 1794455100000,
+      "open": "2052.3",
+      "high": "2054.16",
+      "low": "2051.97",
+      "close": "2053.42",
+      "volume_contracts": "10062.11",
+      "volume_eth": "1006.211",
+      "volume_usdt": "2066117.38331",
       "confirmed": false
     }
   ],
@@ -2199,10 +2199,10 @@
       "open": "2057.21",
       "high": "2058.95",
       "low": "2050.24",
-      "close": "2052.65",
-      "volume_contracts": "222687.37",
-      "volume_eth": "22268.737",
-      "volume_usdt": "45728700.61926",
+      "close": "2053.41",
+      "volume_contracts": "260605.4",
+      "volume_eth": "26060.54",
+      "volume_usdt": "53511371.93046",
       "confirmed": false
     }
   ]
