@@ -1,26 +1,26 @@
 {
   "model": "observer_v3_shadow_research_v0",
-  "observed_at_utc": "2026-11-12T13:11:15.909000+00:00",
-  "observation_id": "1794487500000",
-  "reference_closed_15m_end_utc": "2026-11-12T13:00:00+00:00",
+  "observed_at_utc": "2026-11-12T13:16:06.203000+00:00",
+  "observation_id": "1794488400000",
+  "reference_closed_15m_end_utc": "2026-11-12T13:15:00+00:00",
   "exchange": "OKX",
   "symbol": "ETH-USDT-SWAP",
-  "market_timestamp_ms": 1794489056964,
-  "ticker_snapshot": 1999.99,
-  "short_momentum_15m": 0.0004305,
-  "nonoverlap_h1_background_3h": -0.0134295,
-  "volume_ratio": 0.3775,
-  "structure_high_before_signal": 2047.51,
+  "market_timestamp_ms": 1794489350866,
+  "ticker_snapshot": 2004.09,
+  "short_momentum_15m": -0.0105595,
+  "nonoverlap_h1_background_3h": -0.0116439,
+  "volume_ratio": 7.4257,
+  "structure_high_before_signal": 2045.7,
   "structure_low_before_signal": 2012.0,
   "status": "NO_QUALIFIED_LONG_WATCH",
   "conditions": {
     "momentum": false,
-    "volume": false,
+    "volume": true,
     "structure": false,
     "confirmed_breakout": false
   },
   "paper_trigger_rule": "After signal generated, a future observed quote must cross above prior structure high; historical candle close is NOT assumed to be an executable entry",
-  "paper_trigger_threshold": 2047.51,
+  "paper_trigger_threshold": 2045.7,
   "fill_price": null,
   "trade_opened": false,
   "net_pnl": null,
@@ -34,7 +34,7 @@
   "simulation_only": true,
   "live_order_allowed": false,
   "archive_new_candles": {
-    "15m": 0,
+    "15m": 1,
     "1h": 0
   }
 }
