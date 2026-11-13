@@ -1,28 +1,27 @@
 {
   "model": "observer_ladder_v2_paper_v0",
   "market": "OKX ETH-USDT-SWAP",
-  "observation_id": "1794591000000",
-  "generated_at_utc": "2026-11-13T17:55:52.324000+00:00",
-  "reference_candle_close_time": 1794591900000,
+  "observation_id": "1794591900000",
+  "generated_at_utc": "2026-11-13T18:00:53.534000+00:00",
+  "reference_candle_close_time": 1794592800000,
   "status": "WATCH",
   "direction": "UNCERTAIN",
-  "last_confirmed_15m_close": 1944.47,
-  "latest_ticker_price": 1939.58,
-  "prior_structure_low": 1911.06,
-  "prior_structure_high": 1939.99,
-  "volume_ratio": 0.9589,
-  "h1_momentum_3h": -0.019997,
-  "oi_usd_snapshot": "1360817021.06457251037294",
-  "funding_rate_snapshot": "0.0000089377275442",
+  "last_confirmed_15m_close": 1937.4,
+  "latest_ticker_price": 1936.0,
+  "prior_structure_low": 1916.32,
+  "prior_structure_high": 1946.1,
+  "volume_ratio": 0.514,
+  "h1_momentum_3h": -0.007062,
+  "oi_usd_snapshot": "1356065069.963762129556",
+  "funding_rate_snapshot": "0.0000101061573682",
   "paper_entry_at_closed_candle": null,
   "paper_invalidation_level": null,
   "paper_target_1_5R": null,
   "paper_risk_distance_pct": null,
-  "reasons": [
-    "15m structure breakout observed, confirmation incomplete"
-  ],
+  "reasons": [],
   "counterevidence": [
-    "volume confirmation absent"
+    "volume confirmation absent",
+    "no new 15m structure breakout"
   ],
   "not_used_for_confirmation": [
     "OI delta unavailable without aligned snapshots",
