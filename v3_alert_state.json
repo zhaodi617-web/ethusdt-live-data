@@ -18,9 +18,18 @@
       "id": "1794564000000",
       "sent_ms": 1794565280284,
       "signal_quote": 1951.53,
-      "status": "WATCH",
+      "status": "EXPIRED_NO_OBSERVED_CROSS",
       "structure_low": 1926.66,
       "threshold": 1941.9
+    },
+    "1794568500000": {
+      "created_ms": 1794569465750,
+      "id": "1794568500000",
+      "sent_ms": 1794569477181,
+      "signal_quote": 1955.3,
+      "status": "WATCH",
+      "structure_low": 1933.41,
+      "threshold": 1957.5
     }
   }
 }
