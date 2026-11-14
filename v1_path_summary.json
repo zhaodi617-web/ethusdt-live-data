@@ -1,15 +1,15 @@
 {
   "model": "observer_v1_path_audit_shadow_v0",
-  "generated_at_utc": "2026-11-14T12:06:15.940124+00:00",
+  "generated_at_utc": "2026-11-14T12:16:16.666776+00:00",
   "registered_target_pct": 0.3,
   "registered_stop_pct": 0.3,
-  "saved_evaluations": 95,
-  "new_evaluations": 0,
+  "saved_evaluations": 96,
+  "new_evaluations": 1,
   "up_original_misses": 26,
   "up_misses_with_interior_target_first": 5,
   "interior_touch_counts": {
     "STOP_FIRST_IN_INTERIOR_BARS": 41,
-    "TARGET_FIRST_IN_INTERIOR_BARS": 39,
+    "TARGET_FIRST_IN_INTERIOR_BARS": 40,
     "NONE_IN_FULL_BARS": 11,
     "BOTH_IN_SAME_15M_BAR_ORDER_UNKNOWN": 4
   },
