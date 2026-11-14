@@ -1,30 +1,27 @@
 {
   "model": "observer_ladder_v2_paper_v0",
   "market": "OKX ETH-USDT-SWAP",
-  "observation_id": "1794665700000",
-  "generated_at_utc": "2026-11-14T14:40:51.147000+00:00",
-  "reference_candle_close_time": 1794666600000,
+  "observation_id": "1794666600000",
+  "generated_at_utc": "2026-11-14T14:45:51.456000+00:00",
+  "reference_candle_close_time": 1794667500000,
   "status": "WATCH",
-  "direction": "DOWN",
-  "last_confirmed_15m_close": 1857.29,
-  "latest_ticker_price": 1849.97,
-  "prior_structure_low": 1858.09,
+  "direction": "UNCERTAIN",
+  "last_confirmed_15m_close": 1853.28,
+  "latest_ticker_price": 1857.32,
+  "prior_structure_low": 1841.43,
   "prior_structure_high": 1909.8,
-  "volume_ratio": 4.0261,
+  "volume_ratio": 1.0967,
   "h1_momentum_3h": -0.008086,
-  "oi_usd_snapshot": "1290586989.909001866783",
-  "funding_rate_snapshot": "-0.0000147353134212",
+  "oi_usd_snapshot": "1295282921.2339220808816",
+  "funding_rate_snapshot": "-0.0000153866503397",
   "paper_entry_at_closed_candle": null,
   "paper_invalidation_level": null,
   "paper_target_1_5R": null,
   "paper_risk_distance_pct": null,
-  "reasons": [
-    "15m close broke prior 8-bar low",
-    "15m volume >= 1.2x prior average",
-    "independent 1h trend downward"
-  ],
+  "reasons": [],
   "counterevidence": [
-    "structure stop invalid or excessively far (over 1.5%)"
+    "volume confirmation absent",
+    "no new 15m structure breakout"
   ],
   "not_used_for_confirmation": [
     "OI delta unavailable without aligned snapshots",
