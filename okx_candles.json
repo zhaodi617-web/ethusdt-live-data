@@ -1,19 +1,8 @@
 {
   "exchange": "OKX",
   "symbol": "ETH-USDT-SWAP",
-  "collected_at": "2026-11-15T06:55:51.261722+00:00",
+  "collected_at": "2026-11-15T07:00:54.516238+00:00",
   "candles_15m": [
-    {
-      "time": 1794636000000,
-      "open": "1904.8",
-      "high": "1909.5",
-      "low": "1902.54",
-      "close": "1904.4",
-      "volume_contracts": "232010.66",
-      "volume_eth": "23201.066",
-      "volume_usdt": "44205234.17397",
-      "confirmed": true
-    },
     {
       "time": 1794636900000,
       "open": "1904.39",
@@ -1097,25 +1086,25 @@
       "open": "1795.59",
       "high": "1795.97",
       "low": "1789.36",
-      "close": "1790.32",
-      "volume_contracts": "72075.94",
-      "volume_eth": "7207.594",
-      "volume_usdt": "12915215.13988",
+      "close": "1791.82",
+      "volume_contracts": "104133.83",
+      "volume_eth": "10413.383",
+      "volume_usdt": "18660234.8659",
+      "confirmed": true
+    },
+    {
+      "time": 1794726000000,
+      "open": "1791.82",
+      "high": "1792.14",
+      "low": "1786.84",
+      "close": "1787.53",
+      "volume_contracts": "33505.41",
+      "volume_eth": "3350.541",
+      "volume_usdt": "5992713.86477",
       "confirmed": false
     }
   ],
   "candles_1h": [
-    {
-      "time": 1794366000000,
-      "open": "2057.7",
-      "high": "2068.15",
-      "low": "2056.02",
-      "close": "2061.7",
-      "volume_contracts": "540517.39",
-      "volume_eth": "54051.739",
-      "volume_usdt": "111535556.08744",
-      "confirmed": true
-    },
     {
       "time": 1794369600000,
       "open": "2061.71",
@@ -2199,10 +2188,21 @@
       "open": "1799.55",
       "high": "1800.46",
       "low": "1782.63",
-      "close": "1790.32",
-      "volume_contracts": "1623365.32",
-      "volume_eth": "162336.532",
-      "volume_usdt": "290845006.38269",
+      "close": "1791.82",
+      "volume_contracts": "1655423.21",
+      "volume_eth": "165542.321",
+      "volume_usdt": "296590026.10871",
+      "confirmed": true
+    },
+    {
+      "time": 1794726000000,
+      "open": "1791.82",
+      "high": "1792.14",
+      "low": "1786.84",
+      "close": "1787.54",
+      "volume_contracts": "36647.65",
+      "volume_eth": "3664.765",
+      "volume_usdt": "6554428.06063",
       "confirmed": false
     }
   ]
