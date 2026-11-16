@@ -1,0 +1,48 @@
+name: Observer Ladder V1-S Independent Structural Shadow
+
+on:
+  workflow_run:
+    workflows: ["Update OKX ETH Price"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: observer-v1-s-structural
+  cancel-in-progress: false
+
+jobs:
+  structural:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+      - name: Test independent V1-S before running
+        run: python3 -m unittest -q test_observer_v1_s.py
+      - name: Run forward-only V1-S study
+        run: python3 observer_v1_s.py
+      - name: Persist ONLY V1-S outputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add v1_s_activation.json v1_s_summary.json
+          for f in v1_s_predictions.jsonl v1_s_verifications.jsonl; do
+            if [ -f "$f" ]; then git add "$f"; fi
+          done
+          if ! git diff --cached --quiet; then
+            git commit -m "Record independent forward V1-S structural research"
+            git pull --rebase origin main
+            git push origin main
+          else
+            echo "No new V1-S outputs"
+          fi
