@@ -2,24 +2,26 @@
   "model": "observer_early_v1",
   "exchange": "OKX",
   "symbol": "ETH-USDT-SWAP",
-  "prediction_time": 1794790851111,
-  "target_time": 1794794451111,
-  "reference_price": 1810.94,
+  "prediction_time": 1794794451101,
+  "target_time": 1794798051101,
+  "reference_price": 1805.01,
   "reference_type": "ticker_last",
   "signal": "EARLY_DOWN",
   "score": -2,
-  "momentum_15m": -0.011469690361971319,
-  "momentum_1h": -0.011469690361971319,
-  "volume_ratio": 0.9287872672362332,
-  "oi_change": 0.005215358230970413,
-  "funding_rate": -9.6380296723e-06,
-  "support": 1805.62,
-  "resistance": 1843.0,
+  "momentum_15m": -0.004874928309877791,
+  "momentum_1h": -0.004874928309877791,
+  "volume_ratio": 0.6937965771449834,
+  "oi_change": 0.006145565674909648,
+  "funding_rate": -2.78587447909e-05,
+  "support": 1802.2,
+  "resistance": 1837.62,
   "reasons": [
     "15m downward momentum",
     "1h downward momentum"
   ],
-  "counterevidence": [],
+  "counterevidence": [
+    "Weak recent volume"
+  ],
   "status": "PENDING",
   "simulation_only": true
 }
