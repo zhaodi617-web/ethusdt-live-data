@@ -1,0 +1,51 @@
+name: Observer Ladder V1-S Ablation Shadows
+
+on:
+  workflow_run:
+    workflows: ["Update OKX ETH Price"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: observer-v1-s-ablations
+  cancel-in-progress: false
+
+jobs:
+  ablations:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+
+      - name: Run isolated unit tests
+        run: python3 -m unittest -q test_observer_v1_s_ablations.py
+
+      - name: Generate only new ablation outputs
+        run: python3 observer_v1_s_ablations.py
+
+      - name: Commit only ablation-owned records
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add v1_s_ablation_activation.json v1_s_ablation_summary.json
+          for f in v1_s_ablation_predictions.jsonl v1_s_ablation_verifications.jsonl; do
+            if [ -f "$f" ]; then git add "$f"; fi
+          done
+          if ! git diff --cached --quiet; then
+            git commit -m "Record forward-only V1-S ablation shadows"
+            git pull --rebase origin main
+            git push origin main
+          else
+            echo "No new ablation outputs"
+          fi
