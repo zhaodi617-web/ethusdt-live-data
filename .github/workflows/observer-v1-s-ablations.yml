@@ -1,3 +1,4 @@
+
 name: Observer Ladder V1-S Ablation Shadows
 
 on:
@@ -18,7 +19,8 @@ jobs:
   ablations:
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
+
     steps:
       - name: Checkout latest main
         uses: actions/checkout@v4
@@ -36,16 +38,42 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
           git add v1_s_ablation_activation.json v1_s_ablation_summary.json
+
           for f in v1_s_ablation_predictions.jsonl v1_s_ablation_verifications.jsonl; do
-            if [ -f "$f" ]; then git add "$f"; fi
+            if [ -f "$f" ]; then
+              git add "$f"
+            fi
           done
+
           if ! git diff --cached --quiet; then
             git commit -m "Record forward-only V1-S ablation shadows"
-            git pull --rebase origin main
-            git push origin main
+
+            for attempt in 1 2 3 4 5 6 7 8; do
+              echo "Push attempt $attempt/8"
+
+              if ! git pull --rebase origin main; then
+                git rebase --abort || true
+                echo "::error::Rebase conflict; manual review required."
+                exit 1
+              fi
+
+              if git push origin HEAD:main; then
+                echo "Successfully saved ablation outputs"
+                exit 0
+              fi
+
+              if [ "$attempt" -lt 8 ]; then
+                sleep $((attempt * 4))
+              fi
+            done
+
+            echo "::error::Push failed after 8 attempts."
+            exit 1
           else
             echo "No new ablation outputs"
           fi
