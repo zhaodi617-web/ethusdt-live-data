@@ -1,0 +1,89 @@
+name: Observer V1 Signal Lifecycle
+
+on:
+  workflow_run:
+    workflows: ["Observer Ladder V3 Shadow Research"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: observer-v1-lifecycle
+  cancel-in-progress: false
+
+jobs:
+  lifecycle:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout current main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+
+      - name: Validate lifecycle Python
+        run: python3 -m py_compile v1_lifecycle.py
+
+      - name: Run forward-only lifecycle study
+        run: python3 v1_lifecycle.py
+
+      - name: Save lifecycle research records
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          files=(
+            v1_lifecycle_activation.json
+            v1_lifecycle_results.jsonl
+            v1_lifecycle_summary.json
+          )
+
+          for file in "${files[@]}"; do
+            if [ -f "$file" ]; then
+              git add "$file"
+            fi
+          done
+
+          if git diff --cached --quiet; then
+            echo "No new lifecycle data"
+            exit 0
+          fi
+
+          git commit -m "Record forward-only V1 lifecycle research"
+
+          pushed=false
+
+          for attempt in $(seq 1 12); do
+            echo "Push attempt $attempt"
+
+            git fetch origin main
+
+            if ! git rebase origin/main; then
+              echo "Merge conflict; stop safely"
+              git rebase --abort || true
+              exit 1
+            fi
+
+            if git push origin HEAD:main; then
+              pushed=true
+              break
+            fi
+
+            sleep 2
+          done
+
+          if [ "$pushed" != true ]; then
+            echo "Unable to save lifecycle data"
+            exit 1
+          fi
+
+          echo "Lifecycle research saved"
