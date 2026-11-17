@@ -1,0 +1,15 @@
+{
+  "model": "v1_lifecycle_shadow_v0",
+  "activated_at_ms": 1794959590240,
+  "first_eligible_prediction_ms": 1794960000000,
+  "version": "v0_frozen",
+  "policy": "Forward-only, no historical backfill",
+  "horizons_minutes": [
+    15,
+    30,
+    45,
+    60
+  ],
+  "flat_threshold_fraction": 0.0005,
+  "verification": "first_confirmed_15m_close_at_or_after_target"
+}
