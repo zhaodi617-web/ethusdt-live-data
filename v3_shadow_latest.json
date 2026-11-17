@@ -1,12 +1,12 @@
 {
   "model": "observer_v3_shadow_research_v0",
-  "observed_at_utc": "2026-11-17T20:46:10.886000+00:00",
+  "observed_at_utc": "2026-11-17T20:51:04.877000+00:00",
   "observation_id": "1794947400000",
   "reference_closed_15m_end_utc": "2026-11-17T20:45:00+00:00",
   "exchange": "OKX",
   "symbol": "ETH-USDT-SWAP",
-  "market_timestamp_ms": 1794948356166,
-  "ticker_snapshot": 1798.35,
+  "market_timestamp_ms": 1794948649772,
+  "ticker_snapshot": 1796.18,
   "short_momentum_15m": 0.0006397,
   "nonoverlap_h1_background_3h": 0.0073092,
   "volume_ratio": 0.8534,
@@ -34,7 +34,7 @@
   "simulation_only": true,
   "live_order_allowed": false,
   "archive_new_candles": {
-    "15m": 1,
+    "15m": 0,
     "1h": 0
   }
 }
