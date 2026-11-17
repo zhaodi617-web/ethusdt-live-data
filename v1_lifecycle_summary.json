@@ -1,0 +1,39 @@
+{
+  "model": "v1_lifecycle_shadow_v0",
+  "updated_at_utc": "2026-11-17T23:56:25.004168+00:00",
+  "first_eligible_prediction_ms": 1794960000000,
+  "new_results": 0,
+  "total_results": 0,
+  "by_horizon": {
+    "15": {
+      "hits": 0,
+      "misses": 0,
+      "flats": 0,
+      "directional_samples": 0,
+      "hit_rate_pct": null
+    },
+    "30": {
+      "hits": 0,
+      "misses": 0,
+      "flats": 0,
+      "directional_samples": 0,
+      "hit_rate_pct": null
+    },
+    "45": {
+      "hits": 0,
+      "misses": 0,
+      "flats": 0,
+      "directional_samples": 0,
+      "hit_rate_pct": null
+    },
+    "60": {
+      "hits": 0,
+      "misses": 0,
+      "flats": 0,
+      "directional_samples": 0,
+      "hit_rate_pct": null
+    }
+  },
+  "five_minute_status": "NOT_SUPPORTED_BY_15M_CANDLES",
+  "warning": "15m endpoint verification has a 0-15m delay. No exact intrabar path, fills, fees or net PnL."
+}
