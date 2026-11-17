@@ -18,27 +18,70 @@ jobs:
   event-overlay:
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 4
+    timeout-minutes: 10
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout latest main
+        uses: actions/checkout@v4
         with:
           ref: main
           persist-credentials: true
+
       - name: Verify V1+ event overlay
         run: python3 -m unittest -q test_observer_v1_plus.py
+
       - name: Evaluate V1+ using latest V1 and event calendar
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python3 observer_v1_plus.py
-      - name: Persist V1+ shadow observations
+
+      - name: Persist ONLY V1+ research outputs
+        shell: bash
         run: |
+          set -euo pipefail
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
           git add observer_v1_plus_latest.json observer_v1_plus_history.jsonl
-          if [ -f observer_v1_plus_sent.json ]; then git add observer_v1_plus_sent.json; fi
-          if ! git diff --cached --quiet; then
-            git commit -m "Record Observer V1+ event overlay"
-            git pull --rebase origin main
-            git push origin main
+
+          if [ -f observer_v1_plus_sent.json ]; then
+            git add observer_v1_plus_sent.json
           fi
+
+          if git diff --cached --quiet; then
+            echo "No new V1+ records"
+            exit 0
+          fi
+
+          git commit -m "Record Observer V1+ event overlay"
+
+          pushed=false
+
+          for attempt in $(seq 1 12); do
+            echo "Push attempt $attempt"
+
+            git fetch origin main
+
+            if ! git rebase origin/main; then
+              echo "Rebase conflict detected; stopping safely"
+              git rebase --abort || true
+              exit 1
+            fi
+
+            if git push origin HEAD:main; then
+              pushed=true
+              break
+            fi
+
+            echo "Push failed; retrying"
+            sleep 2
+          done
+
+          if [ "$pushed" != true ]; then
+            echo "Unable to save V1+ records after 12 attempts"
+            exit 1
+          fi
+
+          echo "V1+ research outputs saved successfully"
