@@ -27,13 +27,13 @@ jobs:
           ref: main
           persist-credentials: true
 
-      - name: Test independent V1-S before running
+      - name: Test original V1-S rules
         run: python3 -m unittest -q test_observer_v1_s.py
 
       - name: Run forward-only V1-S study
         run: python3 observer_v1_s.py
 
-      - name: Persist ONLY V1-S outputs
+      - name: Persist original V1-S records
         shell: bash
         run: |
           set -euo pipefail
@@ -50,37 +50,137 @@ jobs:
           done
 
           if git diff --cached --quiet; then
-            echo "No new V1-S outputs"
-            exit 0
-          fi
+            echo "No new V1-S records to persist"
+          else
+            git commit -m "Record original V1-S forward research"
 
-          git commit -m "Record independent forward V1-S structural research"
+            pushed=false
 
-          pushed=false
+            for attempt in $(seq 1 12); do
+              git fetch origin main
 
-          for attempt in $(seq 1 12); do
-            echo "Push attempt $attempt"
+              if ! git rebase origin/main; then
+                git rebase --abort || true
+                echo "Rebase conflict; preserving records"
+                exit 1
+              fi
 
-            git fetch origin main
+              if git push origin HEAD:main; then
+                pushed=true
+                break
+              fi
 
-            if ! git rebase origin/main; then
-              echo "Rebase conflict. Stop safely."
-              git rebase --abort || true
+              echo "Push attempt $attempt failed"
+              sleep 2
+            done
+
+            if [ "$pushed" != true ]; then
+              echo "V1-S persistence failed"
               exit 1
             fi
-
-            if git push origin HEAD:main; then
-              pushed=true
-              break
-            fi
-
-            echo "Push failed. Retrying..."
-            sleep 2
-          done
-
-          if [ "$pushed" != true ]; then
-            echo "Unable to push after 12 attempts"
-            exit 1
           fi
 
-          echo "V1-S research outputs saved successfully"
+      - name: Notify Telegram on a NEW V1-S direction signal
+        continue-on-error: true
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import time
+          import urllib.parse
+          import urllib.request
+          from pathlib import Path
+          from datetime import datetime, timezone
+
+          summary_path = Path("v1_s_summary.json")
+          predictions_path = Path("v1_s_predictions.jsonl")
+
+          if not summary_path.exists() or not predictions_path.exists():
+              print("No V1-S data")
+              raise SystemExit(0)
+
+          summary = json.loads(summary_path.read_text())
+          if summary.get("new_predictions") != 1:
+              print("No newly generated V1-S prediction")
+              raise SystemExit(0)
+
+          rows = [
+              json.loads(line)
+              for line in predictions_path.read_text().splitlines()
+              if line.strip()
+          ]
+
+          if not rows:
+              raise SystemExit(0)
+
+          p = rows[-1]
+
+          if p.get("model") != "observer_v1_s_structural_shadow_v0":
+              raise RuntimeError("Unexpected model")
+
+          if p.get("decision") != "SIGNAL":
+              print("V1-S has no qualified directional signal")
+              raise SystemExit(0)
+
+          now = int(time.time() * 1000)
+          prediction_time = int(p["prediction_time_ms"])
+          age = now - prediction_time
+
+          if age < 0 or age > 15 * 60000:
+              print("Prediction too old for notification")
+              raise SystemExit(0)
+
+          token = os.environ.get("TELEGRAM_BOT_TOKEN")
+          chat_id = os.environ.get("TELEGRAM_CHAT_ID")
+
+          if not token or not chat_id:
+              raise RuntimeError("Telegram configuration missing")
+
+          direction = {
+              "UP": "看涨",
+              "DOWN": "看跌"
+          }.get(p["direction"], "不确定")
+
+          f = p["features"]
+
+          when = datetime.fromtimestamp(
+              prediction_time / 1000, timezone.utc
+          ).strftime("%Y-%m-%d %H:%M UTC")
+
+          message = (
+              "【Observer Ladder｜V1-S独立信号】\n\n"
+              f"预测时间：{when}\n"
+              f"预测方向：{direction}\n"
+              f"参考价格：{p['reference_price']} USDT\n"
+              f"短期30分钟动量：{f['short_30m']*100:+.3f}%\n"
+              f"独立3小时背景：{f['nonoverlap_background_3h']*100:+.3f}%\n"
+              f"成交量比值：{f['volume_ratio']}\n"
+              "预测期限：60分钟\n\n"
+              "仅为研究预测，不是交易指令。\n"
+              "最终HIT/MISS须按原核验规则判定。"
+          )
+
+          data = urllib.parse.urlencode({
+              "chat_id": chat_id,
+              "text": message
+          }).encode("utf-8")
+
+          url = "https://api.telegram.org/bot" + token + "/sendMessage"
+
+          try:
+              req = urllib.request.Request(
+                  url, data=data, method="POST"
+              )
+              with urllib.request.urlopen(req, timeout=20) as response:
+                  result = json.load(response)
+          except Exception:
+              raise RuntimeError("Telegram delivery failed") from None
+
+          if not result.get("ok"):
+              raise RuntimeError("Telegram rejected message")
+
+          print("New V1-S research alert sent")
+          PY
