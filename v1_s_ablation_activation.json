@@ -1,0 +1,11 @@
+{
+  "activated_at_ms": 1794891956136,
+  "activated_at_utc": "2026-11-17T05:05:56.136000+00:00",
+  "version": "v0.0.1_predeclared",
+  "variants": {
+    "S-A": "ALLOW_TREND_CONFLICT",
+    "S-B": "IGNORE_VOLUME_GATE",
+    "S-C": "RELAX_MOMENTUM_LIMITS"
+  },
+  "policy": "Activation creates no forecasts; first prospective predictions are next UTC hour; zero backfill."
+}
