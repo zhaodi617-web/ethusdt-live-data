@@ -1,17 +1,17 @@
 {
   "model": "observer_v1_path_audit_shadow_v0",
-  "generated_at_utc": "2026-11-17T21:56:24.055583+00:00",
+  "generated_at_utc": "2026-11-17T22:22:07.934091+00:00",
   "registered_target_pct": 0.3,
   "registered_stop_pct": 0.3,
-  "saved_evaluations": 176,
-  "new_evaluations": 0,
+  "saved_evaluations": 177,
+  "new_evaluations": 1,
   "up_original_misses": 50,
   "up_misses_with_interior_target_first": 9,
   "interior_touch_counts": {
     "STOP_FIRST_IN_INTERIOR_BARS": 83,
     "TARGET_FIRST_IN_INTERIOR_BARS": 72,
     "NONE_IN_FULL_BARS": 12,
-    "BOTH_IN_SAME_15M_BAR_ORDER_UNKNOWN": 9
+    "BOTH_IN_SAME_15M_BAR_ORDER_UNKNOWN": 10
   },
   "important_limit": "First touch inside FULL 15m bars only. Partial boundary intervals are unobserved; no live fills, no full-window trading hit rate."
 }
