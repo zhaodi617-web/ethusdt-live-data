@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-11-18T14:11:07.205000+00:00",
+  "generated_at_utc": "2026-11-18T14:16:13.322000+00:00",
   "activated_at_utc": "2026-11-17T05:05:56.136000+00:00",
   "version": "v0.0.1_predeclared",
   "variants": {
@@ -8,39 +8,39 @@
       "signals": 15,
       "watch": 11,
       "abstains": 7,
-      "hit": 6,
+      "hit": 7,
       "miss": 8,
       "flat": 0,
-      "pending": 1,
+      "pending": 0,
       "coverage_pct": 45.45,
-      "direction_hit_rate_pct": 42.86
+      "direction_hit_rate_pct": 46.67
     },
     "S-B": {
       "opportunities": 33,
       "signals": 17,
       "watch": 0,
       "abstains": 16,
-      "hit": 5,
+      "hit": 6,
       "miss": 10,
       "flat": 0,
-      "pending": 2,
+      "pending": 1,
       "coverage_pct": 51.52,
-      "direction_hit_rate_pct": 33.33
+      "direction_hit_rate_pct": 37.5
     },
     "S-C": {
       "opportunities": 33,
       "signals": 10,
       "watch": 8,
       "abstains": 15,
-      "hit": 4,
+      "hit": 5,
       "miss": 5,
       "flat": 0,
-      "pending": 1,
+      "pending": 0,
       "coverage_pct": 30.3,
-      "direction_hit_rate_pct": 44.44
+      "direction_hit_rate_pct": 50.0
     }
   },
   "new_predictions": 0,
-  "new_verifications": 0,
+  "new_verifications": 3,
   "warning": "Research only. Uses legacy first confirmed 15m close >= 60m target; no fills or net PnL."
 }
