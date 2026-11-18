@@ -1,10 +1,18 @@
 {
-  "evaluated_at_utc": "2026-11-18T08:16:31.548000+00:00",
-  "market_quote": 1808.57,
-  "market_quote_time": 1794989750073,
+  "evaluated_at_utc": "2026-11-18T08:31:28.694000+00:00",
+  "market_quote": 1811.72,
+  "market_quote_time": 1794990655778,
   "new_alerts": [],
   "note": "No live trading and no verified fills or net P&L; sampled market observations only",
-  "pending": 2,
+  "pending": 1,
   "total_candidates": 14,
-  "updates": []
+  "updates": [
+    {
+      "id": "1794985200000",
+      "net_pnl": null,
+      "observations": 8,
+      "status": "EXPIRED_NO_OBSERVED_CROSS",
+      "warning": "Sampled quotes do not prove no intervening touches"
+    }
+  ]
 }
