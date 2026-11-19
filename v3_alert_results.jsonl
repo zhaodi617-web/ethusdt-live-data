@@ -14,3 +14,4 @@
 {"id": "1794987900000", "net_pnl": null, "observations": 6, "status": "EXPIRED_NO_OBSERVED_CROSS", "warning": "Sampled quotes do not prove no intervening touches"}
 {"id": "1795050000000", "net_pnl": null, "observations": 7, "status": "EXPIRED_NO_OBSERVED_CROSS", "warning": "Sampled quotes do not prove no intervening touches"}
 {"id": "1795060800000", "net_pnl": null, "observations": 4, "status": "EXPIRED_NOT_EVALUABLE", "warning": "Sampled quotes do not prove no intervening touches"}
+{"id": "1795069800000", "net_pnl": null, "status": "TRIGGER_OBSERVED", "trigger_quote_price": 1807.16, "trigger_quote_time": 1795072249766, "warning": "Observed sampling cross, not a fill; OHLC cannot establish intra-bar execution"}
