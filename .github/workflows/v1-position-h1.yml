@@ -1,0 +1,88 @@
+name: Observer V1 Position H1
+
+on:
+  workflow_run:
+    workflows: ["Observer Ladder V3 Shadow Research"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: observer-v1-position-h1
+  cancel-in-progress: false
+
+jobs:
+  position_h1:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+
+      - name: Validate Python
+        run: python3 -m py_compile v1_position_h1.py
+
+      - name: Run forward-only H1 research
+        run: python3 v1_position_h1.py
+
+      - name: Save H1 research files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          files=(
+            v1_position_h1_activation.json
+            v1_position_h1_predictions.jsonl
+            v1_position_h1_verifications.jsonl
+            v1_position_h1_summary.json
+          )
+
+          for f in "${files[@]}"; do
+            if [ -f "$f" ]; then
+              git add "$f"
+            fi
+          done
+
+          if git diff --cached --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+
+          git commit -m "Record forward-only V1 position H1 research"
+
+          pushed=false
+
+          for attempt in $(seq 1 12); do
+            git fetch origin main
+
+            if ! git rebase origin/main; then
+              git rebase --abort || true
+              echo "Rebase conflict; stopping"
+              exit 1
+            fi
+
+            if git push origin HEAD:main; then
+              pushed=true
+              break
+            fi
+
+            sleep 2
+          done
+
+          if [ "$pushed" != true ]; then
+            echo "Could not save H1 results"
+            exit 1
+          fi
+
+          echo "H1 saved successfully"
