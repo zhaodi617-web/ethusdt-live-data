@@ -1,0 +1,13 @@
+{
+  "model": "v1_position_h1_shadow_v0",
+  "activated_at_ms": 1795066415144,
+  "first_eligible_prediction_ms": 1795068000000,
+  "version": "v0_frozen",
+  "lookback_bars": 32,
+  "zones": [
+    "BOTTOM_20 <=0.20",
+    "MIDDLE_20_50",
+    "UPPER_50 >0.50"
+  ],
+  "policy": "No historical backfill. Freeze position before 60m outcome."
+}
