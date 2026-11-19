@@ -1,46 +1,46 @@
 {
-  "generated_at_utc": "2026-11-19T21:57:13.365000+00:00",
+  "generated_at_utc": "2026-11-19T22:01:08.364000+00:00",
   "activated_at_utc": "2026-11-17T05:05:56.136000+00:00",
   "version": "v0.0.1_predeclared",
   "variants": {
     "S-A": {
-      "opportunities": 64,
-      "signals": 29,
+      "opportunities": 65,
+      "signals": 30,
       "watch": 20,
       "abstains": 15,
       "hit": 12,
       "miss": 16,
       "flat": 1,
-      "pending": 0,
-      "coverage_pct": 45.31,
+      "pending": 1,
+      "coverage_pct": 46.15,
       "direction_hit_rate_pct": 42.86
     },
     "S-B": {
-      "opportunities": 64,
-      "signals": 35,
+      "opportunities": 65,
+      "signals": 36,
       "watch": 0,
       "abstains": 29,
       "hit": 17,
       "miss": 18,
       "flat": 0,
-      "pending": 0,
-      "coverage_pct": 54.69,
+      "pending": 1,
+      "coverage_pct": 55.38,
       "direction_hit_rate_pct": 48.57
     },
     "S-C": {
-      "opportunities": 64,
-      "signals": 23,
+      "opportunities": 65,
+      "signals": 24,
       "watch": 15,
       "abstains": 26,
       "hit": 9,
       "miss": 13,
       "flat": 0,
-      "pending": 1,
-      "coverage_pct": 35.94,
+      "pending": 2,
+      "coverage_pct": 36.92,
       "direction_hit_rate_pct": 40.91
     }
   },
-  "new_predictions": 0,
+  "new_predictions": 3,
   "new_verifications": 0,
   "warning": "Research only. Uses legacy first confirmed 15m close >= 60m target; no fills or net PnL."
 }
