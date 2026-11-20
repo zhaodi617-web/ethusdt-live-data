@@ -1,10 +1,10 @@
 {
   "model": "v1_s_reversal_shadow_v0",
-  "updated_at_utc": "2026-11-20T12:11:05.432000+00:00",
+  "updated_at_utc": "2026-11-20T12:16:05.882000+00:00",
   "observations": 69,
   "reversal_candidates": 6,
   "new_predictions": 0,
-  "new_verifications": 0,
+  "new_verifications": 1,
   "results": {
     "15": {
       "hits": 2,
@@ -13,8 +13,8 @@
     },
     "60": {
       "hits": 1,
-      "misses": 3,
-      "hit_rate_pct": 25.0
+      "misses": 4,
+      "hit_rate_pct": 20.0
     }
   },
   "warning": "Research only. No verified fills or net PnL."
