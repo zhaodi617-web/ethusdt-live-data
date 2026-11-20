@@ -1,0 +1,96 @@
+name: CoinGlass ETH Taker Ratio Test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Test ETH taker buy sell ratio
+        env:
+          COINGLASS_API_KEY: ${{ secrets.COINGLASS_API_KEY }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os
+          import json
+          import urllib.parse
+          import urllib.request
+
+          key = os.environ.get(
+              "COINGLASS_API_KEY", ""
+          ).strip()
+
+          if not key:
+              raise SystemExit("Missing GitHub secret")
+
+          base = (
+              "https://open-api-v4.coinglass.com"
+              "/api/futures/"
+              "taker-buy-sell-volume/exchange-list"
+          )
+
+          for period in ("5m", "15m", "1h"):
+              params = urllib.parse.urlencode({
+                  "symbol": "ETH",
+                  "range": period
+              })
+
+              request = urllib.request.Request(
+                  base + "?" + params,
+                  headers={
+                      "CG-API-KEY": key,
+                      "Accept": "application/json"
+                  }
+              )
+
+              with urllib.request.urlopen(
+                  request, timeout=25
+              ) as response:
+                  payload = json.load(response)
+
+              if str(payload.get("code")) != "0":
+                  raise RuntimeError(
+                      "CoinGlass API error for " + period
+                  )
+
+              data = payload.get("data")
+
+              if not isinstance(data, dict):
+                  raise RuntimeError("Unexpected data format")
+
+              buy = float(data["buy_ratio"])
+              sell = float(data["sell_ratio"])
+
+              if not (0 <= buy <= 100 and
+                      0 <= sell <= 100):
+                  raise RuntimeError("Invalid ratio")
+
+              print(
+                  period,
+                  "buy %:", round(buy, 2),
+                  "sell %:", round(sell, 2)
+              )
+
+              for row in data.get(
+                  "exchange_list", []
+              ):
+                  if row.get("exchange") in (
+                      "Binance", "OKX"
+                  ):
+                      print(
+                          " ",
+                          row["exchange"],
+                          "buy %:",
+                          row.get("buy_ratio")
+                      )
+
+          print("PASS: CoinGlass ETH taker API")
+          print("No model changes or files saved")
+          PY
