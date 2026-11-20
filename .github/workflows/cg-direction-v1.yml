@@ -25,10 +25,15 @@ jobs:
           persist-credentials: true
 
       - name: Validate Python syntax
-        run: python3 -m py_compile cg_direction_v1.py
+        run: |
+          python3 -m py_compile cg_direction_v1.py
+          python3 -m py_compile cg_direction_v1_verify.py
 
       - name: Generate independent CG direction
         run: python3 cg_direction_v1.py
+
+      - name: Verify CG direction predictions
+        run: python3 cg_direction_v1_verify.py
 
       - name: Save independent CG records
         shell: bash
@@ -41,7 +46,9 @@ jobs:
           for file in \
             cg_direction_v1_activation.json \
             cg_direction_v1_predictions.jsonl \
-            cg_direction_v1_latest.json
+            cg_direction_v1_latest.json \
+            cg_direction_v1_verifications.jsonl \
+            cg_direction_v1_summary.json
           do
             if [ -f "$file" ]; then
               git add "$file"
@@ -53,7 +60,7 @@ jobs:
             exit 0
           fi
 
-          git commit -m "Record CG-Direction V1 shadow prediction"
+          git commit -m "Record CG-Direction V1 research"
 
           pushed=false
 
@@ -75,13 +82,14 @@ jobs:
           done
 
           if [ "$pushed" != true ]; then
-            echo "CG record persistence failed"
+            echo "CG research persistence failed"
             exit 1
           fi
 
       - name: Research status
         run: |
-          echo "CG-Direction V1 shadow only"
+          echo "CG-Direction V1 independent research"
+          echo "Prediction and verification enabled"
           echo "Telegram notifications disabled"
           echo "Original V1 and V1-CG untouched"
           echo "No live trading"
