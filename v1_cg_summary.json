@@ -1,8 +1,8 @@
 {
   "model": "observer_v1_cg_shadow_v1",
   "predictions_total": 3,
-  "verified_total": 1,
-  "pending_or_unverified": 2,
+  "verified_total": 2,
+  "pending_or_unverified": 1,
   "filtered": {
     "sample": 1,
     "baseline_hits": 0,
@@ -16,6 +16,6 @@
     "baseline_hit_rate_pct": null
   },
   "no_cg_decision_count": 0,
-  "flats": 0,
+  "flats": 1,
   "warning": "Directional endpoints only, not live fills/PnL. CoinGlass exchange data timestamps unverified. Compare matched samples and coverage."
 }
