@@ -1,0 +1,87 @@
+name: CoinGlass ETH OI Collector
+
+on:
+  schedule:
+    - cron: "2-59/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: coinglass-eth-oi-collector
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+
+      - name: Validate collector syntax
+        run: python3 -m py_compile fetch_coinglass.py
+
+      - name: Collect ETH OI from CoinGlass
+        env:
+          COINGLASS_API_KEY: ${{ secrets.COINGLASS_API_KEY }}
+        run: python3 fetch_coinglass.py
+
+      - name: Persist CoinGlass OI records
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          files=(
+            coinglass_oi_latest.json
+            coinglass_oi_history.jsonl
+          )
+
+          for file in "${files[@]}"; do
+            if [ -f "$file" ]; then
+              git add "$file"
+            fi
+          done
+
+          if git diff --cached --quiet; then
+            echo "No new CoinGlass records"
+            exit 0
+          fi
+
+          git commit -m "Record CoinGlass ETH OI observation"
+
+          pushed=false
+
+          for attempt in $(seq 1 12); do
+            echo "Push attempt $attempt"
+
+            git fetch origin main
+
+            if ! git rebase origin/main; then
+              echo "Commit conflict; stopping safely"
+              git rebase --abort || true
+              exit 1
+            fi
+
+            if git push origin HEAD:main; then
+              pushed=true
+              break
+            fi
+
+            sleep 2
+          done
+
+          if [ "$pushed" != true ]; then
+            echo "Failed to persist CoinGlass records"
+            exit 1
+          fi
+
+          echo "CoinGlass OI records saved"
