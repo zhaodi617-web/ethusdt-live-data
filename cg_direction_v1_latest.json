@@ -1,9 +1,9 @@
 {
   "model": "cg_direction_v1",
   "rule_version": "1.0",
-  "prediction_time_ms": 1795177506398,
-  "prediction_time_utc": "2026-11-20T12:25:06.398000+00:00",
-  "target_time_ms": 1795181106398,
+  "prediction_time_ms": 1795182286162,
+  "prediction_time_utc": "2026-11-20T13:44:46.162000+00:00",
+  "target_time_ms": 1795185886162,
   "horizon_minutes": 60,
   "signal": "CG_DOWN",
   "score": -4,
@@ -13,19 +13,19 @@
     "OKX": -1
   },
   "reason": "TAKER_SELL_CONSENSUS",
-  "reference_price": 1737.02,
-  "reference_market_time_ms": 1795177439772,
-  "cg_taker_snapshot_ms": 1795177265376,
-  "cg_oi_snapshot_ms": 1795177290511,
+  "reference_price": 1734.0,
+  "reference_market_time_ms": 1795182050640,
+  "cg_taker_snapshot_ms": 1795182069354,
+  "cg_oi_snapshot_ms": 1795182068576,
   "taker_buy_pct": {
-    "All": 48.75,
-    "Binance": 47.45,
-    "OKX": 48.81
+    "All": 47.6,
+    "Binance": 48.1,
+    "OKX": 48.62
   },
   "oi_change_1h_pct": {
-    "All": -0.84,
-    "Binance": -0.75,
-    "OKX": -0.94
+    "All": 1.03,
+    "Binance": -0.07,
+    "OKX": -0.12
   },
   "oi_used_in_direction_score": false,
   "exchange_source_time_verified": false,
