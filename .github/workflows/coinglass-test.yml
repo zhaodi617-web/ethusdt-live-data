@@ -1,0 +1,97 @@
+name: CoinGlass API Connection Test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Test CoinGlass ETH API
+        env:
+          COINGLASS_API_KEY: ${{ secrets.COINGLASS_API_KEY }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os
+          import json
+          import urllib.request
+          import urllib.parse
+
+          key = os.environ.get("COINGLASS_API_KEY", "").strip()
+
+          if not key:
+              raise SystemExit("FAIL: GitHub secret is missing")
+
+          base = "https://open-api-v4.coinglass.com"
+
+          def fetch(path, params=None):
+              url = base + path
+              if params:
+                  url += "?" + urllib.parse.urlencode(params)
+
+              request = urllib.request.Request(
+                  url,
+                  headers={
+                      "CG-API-KEY": key,
+                      "Accept": "application/json"
+                  }
+              )
+
+              with urllib.request.urlopen(
+                  request, timeout=20
+              ) as response:
+                  payload = json.load(response)
+
+              if str(payload.get("code")) != "0":
+                  print("API business code:",
+                        payload.get("code"))
+                  raise SystemExit(
+                      "FAIL: API authentication or permission"
+                  )
+
+              return payload.get("data")
+
+          coins = fetch("/api/futures/supported-coins")
+
+          if not isinstance(coins, list) or "ETH" not in coins:
+              raise SystemExit("FAIL: ETH not in supported coins")
+
+          print("PASS: API authentication")
+          print("PASS: ETH supported")
+
+          rows = fetch(
+              "/api/futures/open-interest/exchange-list",
+              {"symbol": "ETH"}
+          )
+
+          if not isinstance(rows, list) or not rows:
+              raise SystemExit("FAIL: Empty ETH OI response")
+
+          for exchange in ("All", "Binance", "OKX"):
+              row = next(
+                  (x for x in rows
+                   if x.get("exchange") == exchange),
+                  None
+              )
+
+              if row is None:
+                  print(exchange, "not present")
+                  continue
+
+              print(
+                  exchange,
+                  "OI USD:",
+                  row.get("open_interest_usd"),
+                  "1h change (%):",
+                  row.get("open_interest_change_percent_1h")
+              )
+
+          print("PASS: CoinGlass ETH OI endpoint")
+          print("TEST COMPLETE: No files committed")
+          PY
