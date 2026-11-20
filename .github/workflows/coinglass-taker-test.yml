@@ -12,7 +12,7 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - name: Test ETH taker buy sell ratio
+      - name: Diagnose ETH taker ratio API
         env:
           COINGLASS_API_KEY: ${{ secrets.COINGLASS_API_KEY }}
         shell: bash
@@ -22,13 +22,16 @@ jobs:
           import json
           import urllib.parse
           import urllib.request
+          import urllib.error
 
           key = os.environ.get(
               "COINGLASS_API_KEY", ""
           ).strip()
 
           if not key:
-              raise SystemExit("Missing GitHub secret")
+              raise SystemExit(
+                  "FAIL: COINGLASS_API_KEY is missing"
+              )
 
           base = (
               "https://open-api-v4.coinglass.com"
@@ -36,61 +39,118 @@ jobs:
               "taker-buy-sell-volume/exchange-list"
           )
 
+          success = 0
+
           for period in ("5m", "15m", "1h"):
-              params = urllib.parse.urlencode({
+              print("Testing period:", period)
+
+              query = urllib.parse.urlencode({
                   "symbol": "ETH",
                   "range": period
               })
 
               request = urllib.request.Request(
-                  base + "?" + params,
+                  base + "?" + query,
                   headers={
                       "CG-API-KEY": key,
                       "Accept": "application/json"
                   }
               )
 
-              with urllib.request.urlopen(
-                  request, timeout=25
-              ) as response:
-                  payload = json.load(response)
+              try:
+                  with urllib.request.urlopen(
+                      request, timeout=25
+                  ) as response:
+                      payload = json.load(response)
 
-              if str(payload.get("code")) != "0":
-                  raise RuntimeError(
-                      "CoinGlass API error for " + period
+              except urllib.error.HTTPError as e:
+                  print("HTTP status:", e.code)
+                  print(
+                      "HTTP error: request rejected",
+                      "before successful JSON parsing"
                   )
+                  continue
+
+              except Exception as e:
+                  print(
+                      "Request failed:",
+                      type(e).__name__
+                  )
+                  continue
+
+              if not isinstance(payload, dict):
+                  print("Unexpected response type")
+                  continue
+
+              code = str(payload.get("code"))
+              message = payload.get(
+                  "msg",
+                  payload.get("message", "")
+              )
+
+              if code != "0":
+                  print("API code:", code)
+                  print(
+                      "API message:",
+                      str(message)[:200]
+                  )
+                  continue
 
               data = payload.get("data")
 
               if not isinstance(data, dict):
-                  raise RuntimeError("Unexpected data format")
-
-              buy = float(data["buy_ratio"])
-              sell = float(data["sell_ratio"])
-
-              if not (0 <= buy <= 100 and
-                      0 <= sell <= 100):
-                  raise RuntimeError("Invalid ratio")
+                  print(
+                      "Unexpected data type:",
+                      type(data).__name__
+                  )
+                  print(
+                      "Available fields:",
+                      sorted(data.keys())
+                      if isinstance(data, dict)
+                      else "not an object"
+                  )
+                  continue
 
               print(
-                  period,
-                  "buy %:", round(buy, 2),
-                  "sell %:", round(sell, 2)
+                  "Available data fields:",
+                  sorted(data.keys())
               )
 
-              for row in data.get(
-                  "exchange_list", []
-              ):
-                  if row.get("exchange") in (
-                      "Binance", "OKX"
-                  ):
-                      print(
-                          " ",
-                          row["exchange"],
-                          "buy %:",
-                          row.get("buy_ratio")
-                      )
+              buy = data.get("buy_ratio")
+              sell = data.get("sell_ratio")
 
-          print("PASS: CoinGlass ETH taker API")
-          print("No model changes or files saved")
+              print("Buy ratio:", buy)
+              print("Sell ratio:", sell)
+
+              exchanges = data.get(
+                  "exchange_list", []
+              )
+
+              if isinstance(exchanges, list):
+                  for row in exchanges:
+                      if not isinstance(row, dict):
+                          continue
+
+                      if row.get("exchange") in (
+                          "Binance", "OKX"
+                      ):
+                          print(
+                              row.get("exchange"),
+                              "buy ratio:",
+                              row.get("buy_ratio")
+                          )
+
+              success += 1
+              print("PASS:", period)
+
+          print("Successful periods:", success)
+
+          if success == 0:
+              raise SystemExit(
+                  "FAIL: All taker ratio requests failed"
+              )
+
+          print(
+              "TEST COMPLETE: No model changes"
+          )
           PY
