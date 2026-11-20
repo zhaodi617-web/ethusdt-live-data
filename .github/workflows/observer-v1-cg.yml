@@ -31,6 +31,7 @@ jobs:
         run: |
           python3 -m py_compile v1_cg_shadow.py
           python3 -m py_compile v1_cg_verify.py
+          python3 -m py_compile v1_cg_telegram.py
 
       - name: Run independent V1-CG prediction
         run: python3 v1_cg_shadow.py
@@ -57,34 +58,72 @@ jobs:
             fi
           done
 
-          if git diff --cached --quiet; then
-            echo "No new V1-CG records"
+          if ! git diff --cached --quiet; then
+            git commit -m "Record independent V1-CG research"
+
+            pushed=false
+            for attempt in $(seq 1 12); do
+              git fetch origin main
+              if ! git rebase origin/main; then
+                git rebase --abort || true
+                exit 1
+              fi
+              if git push origin HEAD:main; then
+                pushed=true
+                break
+              fi
+              sleep 2
+            done
+
+            if [ "$pushed" != true ]; then
+              echo "Research persistence failed"
+              exit 1
+            fi
+          fi
+
+      - name: Send V1-CG Telegram research notifications
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python3 v1_cg_telegram.py
+
+      - name: Persist V1-CG Telegram deduplication state
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ ! -f v1_cg_telegram_state.json ]; then
+            echo "No Telegram state changes"
             exit 0
           fi
 
-          git commit -m "Record independent V1-CG shadow research"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add v1_cg_telegram_state.json
+
+          if git diff --cached --quiet; then
+            echo "No new Telegram events"
+            exit 0
+          fi
+
+          git commit -m "Persist V1-CG Telegram notification state"
 
           pushed=false
-
           for attempt in $(seq 1 12); do
             git fetch origin main
-
             if ! git rebase origin/main; then
               git rebase --abort || true
-              echo "Rebase conflict; records not overwritten"
               exit 1
             fi
-
             if git push origin HEAD:main; then
               pushed=true
               break
             fi
-
-            echo "Push retry $attempt"
             sleep 2
           done
 
           if [ "$pushed" != true ]; then
-            echo "Failed to persist V1-CG records"
+            echo "Telegram state persistence failed"
             exit 1
           fi
