@@ -18,34 +18,76 @@ jobs:
   alert:
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
+
     steps:
-      - name: Checkout main after V3 research run
+      - name: Checkout latest main
         uses: actions/checkout@v4
         with:
           ref: main
           persist-credentials: true
-      - name: Test Telegram and forward-only verification logic
+
+      - name: Test notification logic
         run: python3 -m unittest -q test_v3_alert_verify.py
-      - name: Process new candidate or observed trigger
+
+      - name: Process candidate observations
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python3 v3_alert_verify.py
-      - name: Commit ONLY V3 candidate records
+
+      - name: Persist V3 records safely
         shell: bash
         run: |
           set -euo pipefail
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add v3_alert_latest.json v3_quote_observations.jsonl
-          for file in v3_alert_state.json v3_alert_results.jsonl; do
-            if [ -f "$file" ]; then git add "$file"; fi
+
+          files=(
+            v3_alert_latest.json
+            v3_quote_observations.jsonl
+            v3_alert_state.json
+            v3_alert_results.jsonl
+          )
+
+          for file in "${files[@]}"; do
+            if [ -f "$file" ]; then
+              git add "$file"
+            fi
           done
-          if ! git diff --cached --quiet; then
-            git commit -m "Record V3 candidate alerts and observed quote checks"
-            git pull --rebase origin main
-            git push origin main
-          else
-            echo "No new V3 notification records"
+
+          if git diff --cached --quiet; then
+            echo "No new V3 records"
+            exit 0
           fi
+
+          git commit -m "Record V3 candidate observations"
+
+          pushed=false
+
+          for attempt in $(seq 1 12); do
+            echo "Push attempt $attempt"
+
+            git fetch origin main
+
+            if ! git rebase origin/main; then
+              git rebase --abort || true
+              echo "Conflict detected; stopping safely"
+              exit 1
+            fi
+
+            if git push origin HEAD:main; then
+              pushed=true
+              break
+            fi
+
+            sleep 2
+          done
+
+          if [ "$pushed" != true ]; then
+            echo "Unable to persist V3 records"
+            exit 1
+          fi
+
+          echo "V3 records saved successfully"
