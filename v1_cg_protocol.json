@@ -1,0 +1,14 @@
+{
+  "model": "observer_v1_cg_shadow_v1",
+  "activated_at_ms": 1795158125177,
+  "activated_at_utc": "2026-11-20T07:02:05.177000+00:00",
+  "max_source_age_minutes": 20,
+  "max_capture_delay_minutes": 15,
+  "conflict_buy_below_pct_for_up": 49.0,
+  "conflict_buy_above_pct_for_down": 51.0,
+  "data_source": "CoinGlass API V4",
+  "taker_window": "rolling_4h",
+  "hypothesis": "Strong opposite taker imbalance may identify lower-quality V1 signals",
+  "mode": "prospective_shadow",
+  "trade_execution": false
+}
