@@ -1,0 +1,36 @@
+{
+  "model": "cg_direction_v1",
+  "rule_version": "1.0",
+  "prediction_time_ms": 1795162292496,
+  "prediction_time_utc": "2026-11-20T08:11:32.496000+00:00",
+  "target_time_ms": 1795165892496,
+  "horizon_minutes": 60,
+  "signal": "UNCERTAIN",
+  "score": 1,
+  "score_votes": {
+    "All": 0,
+    "Binance": 0,
+    "OKX": 1
+  },
+  "reason": "INSUFFICIENT_TAKER_CONSENSUS",
+  "reference_price": 1758.01,
+  "reference_market_time_ms": 1795162250030,
+  "cg_taker_snapshot_ms": 1795162264554,
+  "cg_oi_snapshot_ms": 1795162264722,
+  "taker_buy_pct": {
+    "All": 49.79,
+    "Binance": 50.13,
+    "OKX": 51.14
+  },
+  "oi_change_1h_pct": {
+    "All": 0.4,
+    "Binance": 0.67,
+    "OKX": -0.78
+  },
+  "oi_used_in_direction_score": false,
+  "exchange_source_time_verified": false,
+  "outcome": "PENDING",
+  "simulation_only": true,
+  "telegram_enabled": false,
+  "trade_execution": false
+}
