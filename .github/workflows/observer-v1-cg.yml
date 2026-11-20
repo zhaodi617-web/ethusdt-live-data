@@ -1,0 +1,90 @@
+name: Observer Ladder V1-CG Independent Shadow
+
+on:
+  workflow_run:
+    workflows: ["Update OKX ETH Price"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: observer-v1-cg-independent
+  cancel-in-progress: false
+
+jobs:
+  v1-cg:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+
+      - name: Check Python syntax
+        run: |
+          python3 -m py_compile v1_cg_shadow.py
+          python3 -m py_compile v1_cg_verify.py
+
+      - name: Run independent V1-CG prediction
+        run: python3 v1_cg_shadow.py
+
+      - name: Verify 60-minute outcomes
+        run: python3 v1_cg_verify.py
+
+      - name: Save independent research records
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          for file in \
+            v1_cg_protocol.json \
+            v1_cg_predictions.jsonl \
+            v1_cg_verifications.jsonl \
+            v1_cg_summary.json
+          do
+            if [ -f "$file" ]; then
+              git add "$file"
+            fi
+          done
+
+          if git diff --cached --quiet; then
+            echo "No new V1-CG records"
+            exit 0
+          fi
+
+          git commit -m "Record independent V1-CG shadow research"
+
+          pushed=false
+
+          for attempt in $(seq 1 12); do
+            git fetch origin main
+
+            if ! git rebase origin/main; then
+              git rebase --abort || true
+              echo "Rebase conflict; records not overwritten"
+              exit 1
+            fi
+
+            if git push origin HEAD:main; then
+              pushed=true
+              break
+            fi
+
+            echo "Push retry $attempt"
+            sleep 2
+          done
+
+          if [ "$pushed" != true ]; then
+            echo "Failed to persist V1-CG records"
+            exit 1
+          fi
