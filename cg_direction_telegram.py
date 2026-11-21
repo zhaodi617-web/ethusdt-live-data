@@ -1,8 +1,9 @@
 """Independent CG-Direction Telegram research alerts.
 
-Does not alter predictions, verifications, V1 or V1-CG.
-Only sends fresh CG_UP / CG_DOWN predictions and
-their verification results. No trading instructions.
+Display-only revision: add a stable sequential CG prediction number,
+reused in corresponding verification messages. Existing signal, freshness,
+Telegram delivery, and sent-event deduplication rules are unchanged.
+No trading instructions; does not modify prediction/verification JSONL.
 """
 
 import json
@@ -10,7 +11,7 @@ import os
 import time
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 PREDICTIONS = Path("cg_direction_v1_predictions.jsonl")
@@ -21,10 +22,15 @@ PREDICTION_AGE_MS = 15 * 60 * 1000
 VERIFICATION_AGE_MS = 20 * 60 * 1000
 VALID_SIGNALS = {"CG_UP", "CG_DOWN"}
 
+# Display timezone only.
+# Model timestamps and verification remain in UTC.
+DISPLAY_TZ = timezone(timedelta(hours=6, minutes=30))
+
 
 def read_jsonl(path):
     if not path.exists():
         return []
+
     return [
         json.loads(line)
         for line in path.read_text(
@@ -39,6 +45,36 @@ def utc_time(ms):
         int(ms) / 1000,
         timezone.utc
     ).strftime("%m-%d %H:%M UTC")
+
+
+def local_time(ms):
+    return datetime.fromtimestamp(
+        int(ms) / 1000,
+        DISPLAY_TZ
+    ).strftime("%m-%d %H:%M") + "（缅甸时间）"
+
+
+def prediction_id_map(predictions):
+    """Assign stable IDs from original prediction history."""
+
+    timestamps = sorted({
+        int(p["prediction_time_ms"])
+        for p in predictions
+        if p.get("model") == "cg_direction_v1"
+        and p.get("prediction_time_ms") is not None
+    })
+
+    return {
+        ts: "CG-" + str(i).zfill(4)
+        for i, ts in enumerate(timestamps, start=1)
+    }
+
+
+def label_for(ts, id_map):
+    return id_map.get(
+        int(ts),
+        "CG-TS-" + str(int(ts))
+    )
 
 
 def load_state():
@@ -68,58 +104,77 @@ def direction_name(signal):
     }.get(signal, "不确定")
 
 
-def prediction_message(p):
+def prediction_message(p, id_map):
     buy = p.get("taker_buy_pct", {})
+    ts = int(p["prediction_time_ms"])
+    label = label_for(ts, id_map)
 
     return "\n".join([
-        "【Observer Ladder｜CG-Direction V1】",
+        "【Observer Ladder｜CG 方向预测】",
+        "编号：" + label,
         "",
-        "方向预警：" + direction_name(p["signal"]),
-        "预测时间：" + utc_time(p["prediction_time_ms"]),
-        "参考价格：" + str(p["reference_price"]) + " USDT",
-        "预测周期：未来60分钟",
-        "评分：" + str(p["score"]),
+        "方向：" + direction_name(p["signal"]),
+        "评分：" + str(p["score"]) + "（不是胜率）",
+        "参考价：" + str(p["reference_price"]) + " USDT",
+        "预测：" + local_time(ts),
+        "UTC：" + utc_time(ts),
+        "周期：未来60分钟",
         "",
-        "CoinGlass 主动买入比例：",
+        "CoinGlass 近4小时主动买入比例：",
         "全市场：" + str(buy.get("All", "未知")) + "%",
         "Binance：" + str(buy.get("Binance", "未知")) + "%",
         "OKX：" + str(buy.get("OKX", "未知")) + "%",
         "",
-        "等待后续价格方向核验。",
-        "研究预测，不是交易指令。"
+        "状态：等待核验",
+        "核验消息将使用同一编号。",
+        "仅供研究，不是交易指令。"
     ])
 
 
-def verification_message(v):
-    result = v["result"]
+def verification_message(v, id_map):
+    ts = int(v["prediction_time_ms"])
+    label = label_for(ts, id_map)
 
+    result = v["result"]
     price_change = v.get("return_pct")
+
     change_text = (
         f"{float(price_change):+.3f}%"
         if price_change is not None
         else "无法计算"
     )
 
+    result_text = {
+        "HIT": "HIT｜方向命中",
+        "MISS": "MISS｜方向错误",
+        "FLAT": "FLAT｜价格变化很小",
+        "ABSTAIN": "ABSTAIN｜弃权"
+    }.get(result, str(result))
+
     return "\n".join([
-        "【Observer Ladder｜CG-Direction 核验】",
+        "【Observer Ladder｜CG 方向核验】",
+        "对应预测：" + label,
         "",
+        "核验结果：" + result_text,
         "原预测：" + direction_name(v["signal"]),
-        "预测时间：" + utc_time(v["prediction_time_ms"]),
-        "核验时间：" + utc_time(v["verification_time_ms"]),
-        "参考价格：" + str(v["reference_price"]) + " USDT",
-        "核验价格：" + str(v["verification_price"]) + " USDT",
+        "预测：" + local_time(ts),
+        "核验：" + local_time(v["verification_time_ms"]),
+        "UTC核验：" + utc_time(v["verification_time_ms"]),
+        "参考价：" + str(v["reference_price"]) + " USDT",
+        "核验价：" + str(v["verification_price"]) + " USDT",
         "价格变化：" + change_text,
         "",
-        "核验结果：" + result,
-        "",
-        "仅核验方向，不代表实际交易收益。"
+        "只核验方向，不代表实际交易收益。"
     ])
 
 
 def collect_events(now):
     events = []
 
-    for p in read_jsonl(PREDICTIONS):
+    predictions = read_jsonl(PREDICTIONS)
+    id_map = prediction_id_map(predictions)
+
+    for p in predictions:
         if p.get("model") != "cg_direction_v1":
             continue
 
@@ -137,7 +192,7 @@ def collect_events(now):
         events.append((
             ts,
             "prediction:" + str(ts),
-            prediction_message(p)
+            prediction_message(p, id_map)
         ))
 
     for v in read_jsonl(VERIFICATIONS):
@@ -157,20 +212,29 @@ def collect_events(now):
         events.append((
             created,
             "verification:" + str(ts),
-            verification_message(v)
+            verification_message(v, id_map)
         ))
 
     return sorted(events, key=lambda x: x[0])
 
 
 def send_message(message):
-    token = os.environ.get("CG_TELEGRAM_BOT_TOKEN", "")
-    chat_id = os.environ.get("CG_TELEGRAM_CHAT_ID", "")
+    token = os.environ.get(
+        "CG_TELEGRAM_BOT_TOKEN", ""
+    )
+
+    chat_id = os.environ.get(
+        "CG_TELEGRAM_CHAT_ID", ""
+    )
 
     if not token or not chat_id:
         raise RuntimeError("Missing CG Telegram secrets")
 
-    url = "https://api.telegram.org/bot" + token + "/sendMessage"
+    url = (
+        "https://api.telegram.org/bot"
+        + token
+        + "/sendMessage"
+    )
 
     data = urllib.parse.urlencode({
         "chat_id": chat_id,
@@ -189,6 +253,7 @@ def send_message(message):
             timeout=20
         ) as response:
             result = json.load(response)
+
     except Exception:
         raise RuntimeError(
             "CG Telegram delivery failed"
@@ -202,8 +267,8 @@ def send_message(message):
 
 def main():
     now = int(time.time() * 1000)
-    state = load_state()
 
+    state = load_state()
     sent = set(state.get("sent_events", []))
     count = 0
 
