@@ -1,6 +1,6 @@
 {
   "model": "observer_v3_shadow_research_v0",
-  "observed_at_utc": "2026-11-21T15:46:13.918000+00:00",
+  "observed_at_utc": "2026-11-21T15:46:28.789000+00:00",
   "observation_id": "1795275000000",
   "reference_closed_15m_end_utc": "2026-11-21T15:45:00+00:00",
   "exchange": "OKX",
@@ -34,7 +34,7 @@
   "simulation_only": true,
   "live_order_allowed": false,
   "archive_new_candles": {
-    "15m": 1,
+    "15m": 0,
     "1h": 0
   }
 }
