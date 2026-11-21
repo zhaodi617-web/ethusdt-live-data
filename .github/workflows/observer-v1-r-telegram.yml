@@ -19,30 +19,66 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 5
+
     steps:
       - name: Read current V1 and V1-R outputs
         uses: actions/checkout@v4
         with:
           ref: main
           persist-credentials: true
+
       - name: Verify strict disagreement alert rules
         run: python3 -m unittest -q test_v1_r_telegram.py
+
       - name: Send Chinese message only for important new disagreement
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python3 v1_r_telegram.py
+
       - name: Save only deduplication state
         shell: bash
         run: |
           set -euo pipefail
-          if [ -f v1_r_telegram_state.json ]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add v1_r_telegram_state.json
-            if ! git diff --cached --quiet; then
-              git commit -m "Record V1-R Telegram disagreement notification"
-              git pull --rebase origin main
-              git push origin main
-            fi
+
+          file="v1_r_telegram_state.json"
+
+          if [ ! -f "$file" ]; then
+            echo "No deduplication state to save"
+            exit 0
           fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -- "$file"
+
+          if git diff --cached --quiet; then
+            echo "Deduplication state unchanged"
+            exit 0
+          fi
+
+          git commit -m "Record V1-R Telegram disagreement notification"
+
+          for attempt in $(seq 1 12); do
+            echo "Deduplication state push attempt $attempt of 12"
+
+            git fetch origin main
+
+            if ! git rebase origin/main; then
+              git rebase --abort || true
+              echo "ERROR: conflicting deduplication state; no force push"
+              exit 1
+            fi
+
+            if git push origin HEAD:main; then
+              echo "PASS: V1-R Telegram deduplication state saved"
+              exit 0
+            fi
+
+            echo "Concurrent branch update; retrying without resending Telegram"
+            sleep 2
+          done
+
+          echo "ERROR: state was not saved; Telegram may already have been sent"
+          exit 1
