@@ -1,18 +1,18 @@
 {
   "exchange": "OKX",
   "symbol": "ETH-USDT-SWAP",
-  "collected_at": "2026-11-21T15:00:51.363738+00:00",
+  "collected_at": "2026-11-21T15:05:22.304452+00:00",
   "open_interest": {
-    "contracts": "6609342.29000001066",
-    "base_currency": "660934.229000001066",
-    "usd_value": "1116747520.0298518011669",
-    "timestamp": "1795273251079"
+    "contracts": "6600283.83000001089",
+    "base_currency": "660028.383000001089",
+    "usd_value": "1117131039.64665184318695",
+    "timestamp": "1795273522122"
   },
   "funding": {
-    "rate": "0.0000013782333234",
+    "rate": "-0.0000008253715390",
     "next_rate": "",
     "funding_time": "1795276800000",
     "next_funding_time": "1795305600000",
-    "timestamp": "1795273218848"
+    "timestamp": "1795273506770"
   }
 }
