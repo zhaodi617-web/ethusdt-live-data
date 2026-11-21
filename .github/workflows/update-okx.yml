@@ -69,7 +69,13 @@ jobs:
           from datetime import datetime, timezone
 
           diff = subprocess.run(
-              ['git', 'diff', '--unified=0', '--', 'observer_verifications.jsonl'],
+              [
+                  'git',
+                  'diff',
+                  '--unified=0',
+                  '--',
+                  'observer_verifications.jsonl'
+              ],
               capture_output=True,
               text=True,
               check=True
@@ -118,10 +124,13 @@ jobs:
                   ).strftime('%Y-%m-%d %H:%M:%S UTC')
 
                   result_label = labels.get(
-                      r['result'], r['result']
+                      r['result'],
+                      r['result']
                   )
+
                   direction_label = directions.get(
-                      r['signal'], r['signal']
+                      r['signal'],
+                      r['signal']
                   )
 
                   message = (
@@ -150,7 +159,8 @@ jobs:
                   )
 
                   with urllib.request.urlopen(
-                      request, timeout=20
+                      request,
+                      timeout=20
                   ) as response:
                       result = json.load(response)
 
@@ -171,7 +181,10 @@ jobs:
         run: python3 observer_v2.py
 
       - name: Commit market data and predictions
+        shell: bash
         run: |
+          set -euo pipefail
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
@@ -197,8 +210,38 @@ jobs:
             fi
           done
 
-          if ! git diff --cached --quiet; then
-            git commit -m "Update ETH data and Observer V2"
-            git pull --rebase origin main
-            git push origin main
+          if git diff --cached --quiet; then
+            echo "No new OKX or Observer records"
+            exit 0
           fi
+
+          git commit -m "Update ETH data and Observer V2"
+
+          pushed=false
+
+          for attempt in $(seq 1 12); do
+            echo "Push attempt: $attempt of 12"
+
+            git fetch origin main
+
+            if ! git rebase origin/main; then
+              git rebase --abort || true
+              echo "Rebase conflict; records not overwritten"
+              exit 1
+            fi
+
+            if git push origin HEAD:main; then
+              pushed=true
+              break
+            fi
+
+            echo "Concurrent repository update detected"
+            sleep 2
+          done
+
+          if [ "$pushed" != true ]; then
+            echo "Failed to persist after 12 attempts"
+            exit 1
+          fi
+
+          echo "PASS: OKX and Observer data saved"
