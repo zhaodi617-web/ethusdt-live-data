@@ -1,7 +1,7 @@
 {
   "model": "observer_v1_s_structural_shadow_v0",
   "activated_at_utc": "2026-11-16T02:31:02.658000+00:00",
-  "generated_at_utc": "2026-11-21T16:16:03.518000+00:00",
+  "generated_at_utc": "2026-11-21T16:21:02.817000+00:00",
   "opportunities": 134,
   "signals": 34,
   "watch": 23,
@@ -13,6 +13,6 @@
   "hit_rate_pct": 44.12,
   "pending_signals": 0,
   "new_predictions": 0,
-  "new_verifications": 1,
+  "new_verifications": 0,
   "warning": "Legacy 15m endpoint after 60m target; delay recorded. No exact 1m endpoint, no fills, no PnL."
 }
