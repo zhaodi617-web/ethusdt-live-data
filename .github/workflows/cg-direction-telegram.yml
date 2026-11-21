@@ -1,0 +1,89 @@
+name: CG-Direction Independent Telegram
+
+on:
+  workflow_run:
+    workflows: ["CG-Direction V1 Independent Shadow"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cg-direction-telegram-independent
+  cancel-in-progress: false
+
+jobs:
+  notify:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+
+      - name: Validate notifier syntax
+        run: python3 -m py_compile cg_direction_telegram.py
+
+      - name: Send independent CG research alerts
+        env:
+          CG_TELEGRAM_BOT_TOKEN: ${{ secrets.CG_TELEGRAM_BOT_TOKEN }}
+          CG_TELEGRAM_CHAT_ID: ${{ secrets.CG_TELEGRAM_CHAT_ID }}
+        run: python3 cg_direction_telegram.py
+
+      - name: Save CG Telegram deduplication state
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ ! -f cg_direction_telegram_state.json ]; then
+            echo "No new CG notification state"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add cg_direction_telegram_state.json
+
+          if git diff --cached --quiet; then
+            echo "No new notification events"
+            exit 0
+          fi
+
+          git commit -m "Record CG Telegram notifications"
+
+          pushed=false
+
+          for attempt in $(seq 1 12); do
+            git fetch origin main
+
+            if ! git rebase origin/main; then
+              git rebase --abort || true
+              echo "State rebase conflict"
+              exit 1
+            fi
+
+            if git push origin HEAD:main; then
+              pushed=true
+              break
+            fi
+
+            sleep 2
+          done
+
+          if [ "$pushed" != true ]; then
+            echo "Failed to persist CG notification state"
+            exit 1
+          fi
+
+      - name: Research notification status
+        run: |
+          echo "CG Telegram independent notifier completed"
+          echo "Original V1 and V1-CG untouched"
+          echo "No live trading"
