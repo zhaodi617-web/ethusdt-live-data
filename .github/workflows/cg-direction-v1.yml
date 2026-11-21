@@ -1,8 +1,14 @@
 name: CG-Direction V1 Independent Shadow
 
 on:
+  workflow_run:
+    workflows: ["Update OKX ETH Price"]
+    types: [completed]
+    branches: [main]
+
   schedule:
     - cron: "9-59/5 * * * *"
+
   workflow_dispatch:
 
 permissions:
@@ -14,6 +20,10 @@ concurrency:
 
 jobs:
   predict:
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
+
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -90,6 +100,7 @@ jobs:
         run: |
           echo "CG-Direction V1 independent research"
           echo "Prediction and verification enabled"
-          echo "Telegram notifications disabled"
+          echo "Triggered by successful OKX update or schedule"
+          echo "CG Telegram handled by independent workflow"
           echo "Original V1 and V1-CG untouched"
           echo "No live trading"
