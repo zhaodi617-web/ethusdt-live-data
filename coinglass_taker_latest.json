@@ -4,21 +4,21 @@
   "metric": "taker_buy_sell_ratio",
   "api_range": "4h",
   "window_type": "rolling_4h",
-  "collected_at_ms": 1795264267145,
-  "collected_at_utc": "2026-11-21T12:31:07.145000+00:00",
-  "bucket_5m": 5984214,
+  "collected_at_ms": 1795264564189,
+  "collected_at_utc": "2026-11-21T12:36:04.189000+00:00",
+  "bucket_5m": 5984215,
   "data": {
     "All": {
-      "buy_pct": 53.76,
-      "sell_pct": 46.24
+      "buy_pct": 55.05,
+      "sell_pct": 44.95
     },
     "Binance": {
-      "buy_pct": 53.14,
-      "sell_pct": 46.86
+      "buy_pct": 54.47,
+      "sell_pct": 45.53
     },
     "OKX": {
-      "buy_pct": 54.92,
-      "sell_pct": 45.08
+      "buy_pct": 57.08,
+      "sell_pct": 42.92
     }
   },
   "source_timestamp_verified": false,
