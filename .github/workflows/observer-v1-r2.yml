@@ -16,33 +16,77 @@ concurrency:
 
 jobs:
   precision:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+
     runs-on: ubuntu-latest
     timeout-minutes: 5
+
     steps:
       - name: Checkout main
         uses: actions/checkout@v4
         with:
           ref: main
           persist-credentials: true
+
       - name: Run V1-R2 tests
         run: python3 -m unittest -q test_observer_v1_r2.py
+
       - name: Record forward-only shadow research
         run: python3 observer_v1_r2.py
+
       - name: Commit only independent V1-R2 files
         shell: bash
         run: |
           set -euo pipefail
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
           git add v1_r2_activation.json v1_r2_summary.json
-          for f in v1_r2_predictions.jsonl v1_r2_verifications.jsonl; do
-            if [ -f "$f" ]; then git add "$f"; fi
+
+          for file in \
+            v1_r2_predictions.jsonl \
+            v1_r2_verifications.jsonl
+          do
+            if [ -f "$file" ]; then
+              git add "$file"
+            fi
           done
-          if ! git diff --cached --quiet; then
-            git commit -m "Record V1-R2 forward precision research"
-            git pull --rebase origin main
-            git push origin main
-          else
+
+          if git diff --cached --quiet; then
             echo "No new V1-R2 data"
+            exit 0
           fi
+
+          git commit -m "Record V1-R2 forward precision research"
+
+          pushed=false
+
+          for attempt in $(seq 1 12); do
+            echo "V1-R2 push attempt: $attempt of 12"
+
+            git fetch origin main
+
+            if ! git rebase origin/main; then
+              git rebase --abort || true
+              echo "Actual content conflict; no forced overwrite"
+              exit 1
+            fi
+
+            if git push origin HEAD:main; then
+              pushed=true
+              break
+            fi
+
+            echo "Concurrent GitHub update detected"
+            sleep 2
+          done
+
+          if [ "$pushed" != true ]; then
+            echo "V1-R2 save failed after 12 attempts"
+            exit 1
+          fi
+
+          echo "PASS: Independent V1-R2 records saved"
