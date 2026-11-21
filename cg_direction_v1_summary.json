@@ -1,13 +1,13 @@
 {
   "model": "cg_direction_v1",
-  "predictions_total": 23,
-  "verified_total": 21,
-  "pending": 2,
+  "predictions_total": 24,
+  "verified_total": 23,
+  "pending": 1,
   "hits": 9,
-  "misses": 2,
+  "misses": 4,
   "flats": 1,
   "abstains": 9,
   "unverifiable": 0,
-  "direction_hit_rate_pct": 81.82,
+  "direction_hit_rate_pct": 69.23,
   "warning": "Research-only directional verification. No fills or net PnL."
 }
