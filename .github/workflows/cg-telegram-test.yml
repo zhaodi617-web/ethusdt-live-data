@@ -1,0 +1,71 @@
+name: CG Telegram Independent Test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+
+    steps:
+      - name: Send test message to CG bot
+        env:
+          CG_TOKEN: ${{ secrets.CG_TELEGRAM_BOT_TOKEN }}
+          CG_CHAT_ID: ${{ secrets.CG_TELEGRAM_CHAT_ID }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import json
+          import urllib.parse
+          import urllib.request
+
+          token = os.environ.get("CG_TOKEN", "")
+          chat_id = os.environ.get("CG_CHAT_ID", "")
+
+          if not token or not chat_id:
+              raise SystemExit("Missing CG Telegram secrets")
+
+          url = (
+              "https://api.telegram.org/bot"
+              + token + "/sendMessage"
+          )
+
+          message = (
+              "✅ Observer Ladder CG\n\n"
+              "独立 Telegram 测试成功！\n"
+              "CG-Direction 通知通道已连接。\n\n"
+              "这只是连接测试，不是市场预测。"
+          )
+
+          data = urllib.parse.urlencode({
+              "chat_id": chat_id,
+              "text": message
+          }).encode("utf-8")
+
+          request = urllib.request.Request(
+              url,
+              data=data,
+              method="POST"
+          )
+
+          try:
+              with urllib.request.urlopen(
+                  request, timeout=20
+              ) as response:
+                  result = json.load(response)
+          except Exception:
+              raise SystemExit(
+                  "CG Telegram test failed"
+              ) from None
+
+          if not result.get("ok"):
+              raise SystemExit(
+                  "Telegram did not confirm delivery"
+              )
+
+          print("CG Telegram test: PASS")
+          PY
