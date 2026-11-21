@@ -1,16 +1,16 @@
 {
   "model": "v1_lifecycle_shadow_v0",
-  "updated_at_utc": "2026-11-21T02:26:27.835944+00:00",
+  "updated_at_utc": "2026-11-21T02:31:29.078103+00:00",
   "first_eligible_prediction_ms": 1794960000000,
-  "new_results": 0,
-  "total_results": 276,
+  "new_results": 1,
+  "total_results": 277,
   "by_horizon": {
     "15": {
       "hits": 30,
-      "misses": 32,
+      "misses": 33,
       "flats": 7,
-      "directional_samples": 62,
-      "hit_rate_pct": 48.39
+      "directional_samples": 63,
+      "hit_rate_pct": 47.62
     },
     "30": {
       "hits": 34,
