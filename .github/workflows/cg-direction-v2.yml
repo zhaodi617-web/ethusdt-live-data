@@ -1,8 +1,10 @@
 name: CG-Direction V2 Independent Shadow
 
-# Manual testing only. Automatic scheduling is not enabled yet.
+# Isolated V2 research. No live trading or Telegram.
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "1-56/5 * * * *"
 
 permissions:
   contents: write
@@ -37,7 +39,6 @@ jobs:
 
           now = 1800000000000
 
-          # Never select future CoinGlass snapshots.
           history = [
               {'collected_at_ms': now - 1000},
               {'collected_at_ms': now + 1000},
@@ -45,7 +46,6 @@ jobs:
           selected = m.latest_asof(history, now, 60000)
           assert selected['collected_at_ms'] == now - 1000
 
-          # Use only already-confirmed candles.
           bars = []
           for i in range(10):
               bars.append({
@@ -69,7 +69,6 @@ jobs:
           }
           assert len(m.confirmed_m15(source, now)) == 10
 
-          # Rising price + buying pressure + OI expansion.
           taker_up = {
               'data': {
                   'All': {'buy_pct': 52},
@@ -92,7 +91,6 @@ jobs:
           assert signal == 'CG_V2_UP'
           assert votes['oi_price_confirmation'] == 1
 
-          # Opposite pressure must not become an UP signal.
           taker_down = {
               'data': {
                   'All': {'buy_pct': 48},
@@ -106,7 +104,6 @@ jobs:
           )
           assert signal == 'CG_V2_DOWN'
 
-          # Confirm that repeated verification is not duplicated.
           pred = {
               'model': m.VERSION,
               'prediction_time_ms': now - m.HOUR - 600000,
@@ -150,7 +147,6 @@ jobs:
             cg_direction_v2_predictions.jsonl
             cg_direction_v2_verifications.jsonl
             cg_direction_v2_latest.json
-            cg_direction_v2_summary.json
           )
 
           for file in "${files[@]}"; do
@@ -159,9 +155,15 @@ jobs:
             fi
           done
 
+          # No new predictions or verifications:
+          # do not commit the refreshed summary alone.
           if git diff --cached --quiet; then
-            echo "No new V2 research records"
+            echo "No new V2 research; no commit"
             exit 0
+          fi
+
+          if [ -f cg_direction_v2_summary.json ]; then
+            git add cg_direction_v2_summary.json
           fi
 
           git commit -m "Record isolated CG-Direction V2 research"
@@ -193,7 +195,8 @@ jobs:
       - name: Confirm research-only mode
         run: |
           echo "CG V2 research completed"
+          echo "Five-minute schedule enabled"
+          echo "At most one V2 prediction per UTC hour"
           echo "Original model files untouched"
           echo "No Telegram messages"
           echo "No live orders"
-          echo "Automatic scheduling not enabled"
