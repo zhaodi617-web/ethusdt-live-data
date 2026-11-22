@@ -1,9 +1,9 @@
 {
   "model": "observer_v1_r_shadow_v0",
-  "evaluated_at_utc": "2026-11-22T21:41:08.557000+00:00",
+  "evaluated_at_utc": "2026-11-22T21:46:11.501000+00:00",
   "predictions_total": 280,
   "new_predictions": 0,
-  "new_verifications": 0,
+  "new_verifications": 1,
   "by_horizon": {
     "15": {
       "hits": 110,
@@ -13,11 +13,11 @@
       "direction_hit_rate_pct": 50.69
     },
     "30": {
-      "hits": 102,
+      "hits": 103,
       "misses": 116,
       "flats": 29,
       "abstains": 32,
-      "direction_hit_rate_pct": 46.79
+      "direction_hit_rate_pct": 47.03
     },
     "45": {
       "hits": 92,
