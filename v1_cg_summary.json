@@ -1,8 +1,8 @@
 {
   "model": "observer_v1_cg_shadow_v1",
   "predictions_total": 58,
-  "verified_total": 56,
-  "pending_or_unverified": 2,
+  "verified_total": 57,
+  "pending_or_unverified": 1,
   "filtered": {
     "sample": 11,
     "baseline_hits": 4,
@@ -10,10 +10,10 @@
     "baseline_hit_rate_pct": 36.36
   },
   "retained": {
-    "sample": 37,
+    "sample": 38,
     "baseline_hits": 23,
-    "baseline_misses": 14,
-    "baseline_hit_rate_pct": 62.16
+    "baseline_misses": 15,
+    "baseline_hit_rate_pct": 60.53
   },
   "no_cg_decision_count": 0,
   "flats": 3,
