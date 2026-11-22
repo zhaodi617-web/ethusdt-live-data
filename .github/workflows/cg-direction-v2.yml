@@ -3,6 +3,12 @@ name: CG-Direction V2 Independent Shadow
 # Isolated V2 research. No live trading or Telegram.
 on:
   workflow_dispatch:
+
+  workflow_run:
+    workflows: ["Update OKX ETH Price"]
+    types: [completed]
+    branches: [main]
+
   schedule:
     - cron: "1-56/5 * * * *"
 
@@ -15,6 +21,10 @@ concurrency:
 
 jobs:
   research:
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
+
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -196,6 +206,7 @@ jobs:
         run: |
           echo "CG V2 research completed"
           echo "Five-minute schedule enabled"
+          echo "OKX workflow trigger enabled"
           echo "At most one V2 prediction per UTC hour"
           echo "Original model files untouched"
           echo "No Telegram messages"
