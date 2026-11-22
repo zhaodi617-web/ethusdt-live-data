@@ -1,21 +1,21 @@
 {
   "source": "CoinGlass API V4",
   "asset": "ETH",
-  "collected_at_utc": "2026-11-22T01:46:09.313771+00:00",
-  "collected_at_ms": 1795311969313,
-  "bucket_5m": 5984373,
+  "collected_at_utc": "2026-11-22T01:51:16.199841+00:00",
+  "collected_at_ms": 1795312276199,
+  "bucket_5m": 5984374,
   "data": {
     "All": {
-      "open_interest_usd": 22094980005.489,
-      "open_interest_change_percent_1h": 0.0
+      "open_interest_usd": 22110307059.5904,
+      "open_interest_change_percent_1h": 0.04
     },
     "Binance": {
-      "open_interest_usd": 6585705626.313115,
-      "open_interest_change_percent_1h": 0.06
+      "open_interest_usd": 6592685146.249998,
+      "open_interest_change_percent_1h": 0.13
     },
     "OKX": {
-      "open_interest_usd": 1401843571.5718217,
-      "open_interest_change_percent_1h": 0.03
+      "open_interest_usd": 1403693101.5204518,
+      "open_interest_change_percent_1h": 0.13
     }
   },
   "research_only": true,
