@@ -1,0 +1,199 @@
+name: CG-Direction V2 Independent Shadow
+
+# Manual testing only. Automatic scheduling is not enabled yet.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cg-direction-v2-independent
+  cancel-in-progress: false
+
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+
+      - name: Validate Python syntax
+        run: python3 -m py_compile cg_direction_v2.py
+
+      - name: Run independent V2 safety tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import tempfile
+          from pathlib import Path
+          import cg_direction_v2 as m
+
+          now = 1800000000000
+
+          # Never select future CoinGlass snapshots.
+          history = [
+              {'collected_at_ms': now - 1000},
+              {'collected_at_ms': now + 1000},
+          ]
+          selected = m.latest_asof(history, now, 60000)
+          assert selected['collected_at_ms'] == now - 1000
+
+          # Use only already-confirmed candles.
+          bars = []
+          for i in range(10):
+              bars.append({
+                  'time': now - (10 - i) * m.M15,
+                  'open': '100',
+                  'high': '101',
+                  'low': '99',
+                  'close': '100',
+                  'volume_usdt': '100',
+                  'confirmed': True,
+              })
+
+          source = {
+              'exchange': 'OKX',
+              'symbol': 'ETH-USDT-SWAP',
+              'candles_15m': bars + [{
+                  'time': now,
+                  'confirmed': False,
+                  'close': '100',
+              }],
+          }
+          assert len(m.confirmed_m15(source, now)) == 10
+
+          # Rising price + buying pressure + OI expansion.
+          taker_up = {
+              'data': {
+                  'All': {'buy_pct': 52},
+                  'Binance': {'buy_pct': 51},
+                  'OKX': {'buy_pct': 51},
+              }
+          }
+          oi = {
+              'data': {
+                  'All': {
+                      'open_interest_change_percent_1h': 0.5
+                  }
+              }
+          }
+          bars[-1]['close'] = '103'
+          bars[-1]['volume_usdt'] = '150'
+          score, votes, features, signal = (
+              m.score_from_features(taker_up, oi, 1.0, bars, now)
+          )
+          assert signal == 'CG_V2_UP'
+          assert votes['oi_price_confirmation'] == 1
+
+          # Opposite pressure must not become an UP signal.
+          taker_down = {
+              'data': {
+                  'All': {'buy_pct': 48},
+                  'Binance': {'buy_pct': 49},
+                  'OKX': {'buy_pct': 49},
+              }
+          }
+          bars[-1]['close'] = '97'
+          score, votes, features, signal = (
+              m.score_from_features(taker_down, oi, -1.0, bars, now)
+          )
+          assert signal == 'CG_V2_DOWN'
+
+          # Confirm that repeated verification is not duplicated.
+          pred = {
+              'model': m.VERSION,
+              'prediction_time_ms': now - m.HOUR - 600000,
+              'target_time_ms': now - 600000,
+              'signal': 'CG_V2_UP',
+              'reference_price': 100,
+          }
+          endpoint = {
+              'time': now - 300000 - m.M15,
+              'close': '101',
+              'confirmed': True,
+          }
+          with tempfile.TemporaryDirectory() as d:
+              old_path = m.VERIFY
+              try:
+                  m.VERIFY = Path(d) / 'results.jsonl'
+                  first = m.verify([pred], [], [endpoint], now)
+                  assert len(first) == 1
+                  assert first[0]['result'] == 'HIT'
+                  second = m.verify([pred], first, [endpoint], now)
+                  assert len(second) == 0
+              finally:
+                  m.VERIFY = old_path
+
+          print('V2 safety tests passed')
+          PY
+
+      - name: Generate and verify V2 shadow predictions
+        run: python3 cg_direction_v2.py
+
+      - name: Persist V2-only research files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          files=(
+            cg_direction_v2_activation.json
+            cg_direction_v2_predictions.jsonl
+            cg_direction_v2_verifications.jsonl
+            cg_direction_v2_latest.json
+            cg_direction_v2_summary.json
+          )
+
+          for file in "${files[@]}"; do
+            if [ -f "$file" ]; then
+              git add "$file"
+            fi
+          done
+
+          if git diff --cached --quiet; then
+            echo "No new V2 research records"
+            exit 0
+          fi
+
+          git commit -m "Record isolated CG-Direction V2 research"
+
+          pushed=false
+
+          for attempt in $(seq 1 12); do
+            git fetch origin main
+
+            if ! git rebase origin/main; then
+              git rebase --abort || true
+              echo "Conflict detected; stopping without overwrite"
+              exit 1
+            fi
+
+            if git push origin HEAD:main; then
+              pushed=true
+              break
+            fi
+
+            sleep 2
+          done
+
+          if [ "$pushed" != true ]; then
+            echo "V2 persistence failed; no silent overwrite"
+            exit 1
+          fi
+
+      - name: Confirm research-only mode
+        run: |
+          echo "CG V2 research completed"
+          echo "Original model files untouched"
+          echo "No Telegram messages"
+          echo "No live orders"
+          echo "Automatic scheduling not enabled"
