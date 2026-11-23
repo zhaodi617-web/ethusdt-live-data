@@ -1,41 +1,27 @@
 {
   "model": "observer_early_v1",
-  "rule_version": "1.3",
+  "rule_version": "1.0_restored_2026_11_24",
   "exchange": "OKX",
   "symbol": "ETH-USDT-SWAP",
-  "prediction_time": 1795467656304,
-  "target_time": 1795471256304,
-  "reference_price": 1727.54,
+  "prediction_time": 1795471252026,
+  "target_time": 1795474852026,
+  "reference_price": 1722.47,
   "reference_type": "ticker_last",
-  "signal": "UNCERTAIN",
-  "score": -1,
-  "momentum_15m": -0.0009907300115875595,
-  "momentum_1h": -0.0037900453534390754,
-  "momentum_background_3h": -0.021422029241154772,
-  "score_components": {
-    "short_15m": 0,
-    "older_nonoverlapping_3h": -1,
-    "structure_confirmed": 0,
-    "early_reversal": 0,
-    "oi": 0,
-    "volume": 0
-  },
-  "volume_ratio": 0.43983,
-  "oi_change": 0.0003531163217849187,
-  "funding_rate": -6.64898329208e-05,
-  "support": 1713.98,
-  "resistance": 1748.8,
-  "breakout_up": false,
-  "breakout_down": false,
-  "context": "NO_STRONG_ALIGNMENT",
+  "signal": "EARLY_DOWN",
+  "score": -3,
+  "momentum_15m": -0.0006437432218477923,
+  "momentum_1h": -0.0006437432218477923,
+  "volume_ratio": 1.1770544549905886,
+  "oi_change": 0.0062876213478968435,
+  "funding_rate": -7.41352408163e-05,
+  "support": 1711.2,
+  "resistance": 1735.35,
   "reasons": [
-    "较早的3小时趋势向下"
+    "15m downward momentum",
+    "1h downward momentum",
+    "OI rising with falling price"
   ],
-  "counterevidence": [
-    "近期成交量偏弱",
-    "最新15分钟动量不足"
-  ],
+  "counterevidence": [],
   "status": "PENDING",
-  "simulation_only": true,
-  "unvalidated_thresholds": true
+  "simulation_only": true
 }
