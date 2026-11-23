@@ -1,9 +1,10 @@
 {
   "model": "observer_v1_r_shadow_v0",
-  "evaluated_at_utc": "2026-11-23T20:46:13.830000+00:00",
+  "rule_version": "1.1_long_horizon",
+  "evaluated_at_utc": "2026-11-23T20:57:29.064000+00:00",
   "predictions_total": 303,
   "new_predictions": 0,
-  "new_verifications": 1,
+  "new_verifications": 0,
   "by_horizon": {
     "15": {
       "hits": 120,
@@ -32,7 +33,21 @@
       "flats": 29,
       "abstains": 55,
       "direction_hit_rate_pct": 45.87
+    },
+    "120": {
+      "hits": 0,
+      "misses": 0,
+      "flats": 0,
+      "abstains": 0,
+      "direction_hit_rate_pct": null
+    },
+    "180": {
+      "hits": 0,
+      "misses": 0,
+      "flats": 0,
+      "abstains": 0,
+      "direction_hit_rate_pct": null
     }
   },
-  "warning": "Research-only. V1 untouched; no path or fill verification, no net PnL."
+  "warning": "Research only. V1.3 untouched. 120m/180m are prospective experiments. Verification may lag target by up to 15m. No fills or net PnL."
 }
