@@ -298,6 +298,15 @@
       "status": "EXPIRED_NO_OBSERVED_CROSS",
       "structure_low": 1710.92,
       "threshold": 1726.66
+    },
+    "1795433400000": {
+      "created_ms": 1795434364047,
+      "id": "1795433400000",
+      "sent_ms": 1795434376743,
+      "signal_quote": 1726.74,
+      "status": "WATCH",
+      "structure_low": 1717.58,
+      "threshold": 1729.7
     }
   }
 }
