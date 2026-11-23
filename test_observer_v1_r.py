@@ -56,13 +56,11 @@ class Tests(unittest.TestCase):
         c, t, n = self.fixture()
         prediction = v.make_prediction(c, t, n)
 
-        expected = [15, 30, 45, 60, 120, 180]
-        actual = [
-            x["horizon_minutes"]
-            for x in prediction["predictions"]
-        ]
-
-        self.assertEqual(actual, expected)
+        self.assertEqual(
+            [x["horizon_minutes"]
+             for x in prediction["predictions"]],
+            [15, 30, 45, 60, 120, 180],
+        )
         self.assertFalse(prediction["live_order_allowed"])
         self.assertTrue(prediction["simulation_only"])
 
@@ -71,11 +69,9 @@ class Tests(unittest.TestCase):
         prediction = v.make_prediction(c, t, n)
 
         for item in prediction["predictions"]:
-            expected = (
-                n + item["horizon_minutes"] * 60_000
-            )
             self.assertEqual(
-                item["target_time_ms"], expected
+                item["target_time_ms"],
+                n + item["horizon_minutes"] * 60_000,
             )
 
     def test_long_horizon_flags(self):
@@ -83,10 +79,9 @@ class Tests(unittest.TestCase):
         prediction = v.make_prediction(c, t, n)
 
         for item in prediction["predictions"]:
-            expected = item["horizon_minutes"] >= 120
             self.assertEqual(
                 item["experimental_long_horizon"],
-                expected,
+                item["horizon_minutes"] >= 120,
             )
 
     def test_original_weights_preserved(self):
@@ -125,11 +120,12 @@ class Tests(unittest.TestCase):
         c, t, n = self.fixture()
         prediction = v.make_prediction(c, t, n)
 
-        result = v.verify(
-            [prediction], [], c, n + 4 * v.HOUR
+        self.assertEqual(
+            v.verify(
+                [prediction], [], c, n + 4 * v.HOUR
+            ),
+            [],
         )
-
-        self.assertEqual(result, [])
 
     def test_verification_first_close(self):
         c, t, n = self.fixture()
@@ -215,10 +211,20 @@ class Tests(unittest.TestCase):
                 json.dumps(t)
             )
 
-            old = v.make_prediction(c, t, n - v.HOUR)
+            # Build a valid fixture at the current timestamp.
+            old = v.make_prediction(c, t, n)
+
+            # Simulate an archived record from the prior hour.
+            # This is test data only, not a real prediction.
+            old["prediction_time_ms"] = n - v.HOUR
             old["rule_version"] = "legacy"
+
             old["predictions"] = [
-                x for x in old["predictions"]
+                dict(
+                    x,
+                    target_time_ms=x["target_time_ms"] - v.HOUR,
+                )
+                for x in old["predictions"]
                 if x["horizon_minutes"] <= 60
             ]
 
@@ -233,6 +239,8 @@ class Tests(unittest.TestCase):
             )
 
             records = v.read_lines(path)
+
+            self.assertEqual(len(records), 2)
             self.assertEqual(
                 len(records[0]["predictions"]), 4
             )
