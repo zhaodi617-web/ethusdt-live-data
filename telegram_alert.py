@@ -112,7 +112,7 @@ counter = "、".join(
 ) or "暂无记录"
 
 message = (
-    "【Observer Ladder ETH｜方向预警】\n\n"
+    "【Observer Ladder ETH｜V1 大模型】\n\n"
     f"预测编号：{prediction_id}\n"
     f"预测时间：{prediction_time}\n\n"
     f"预测方向：{direction}\n"
