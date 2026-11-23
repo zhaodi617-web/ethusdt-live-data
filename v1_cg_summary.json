@@ -1,13 +1,13 @@
 {
   "model": "observer_v1_cg_shadow_v1",
   "predictions_total": 65,
-  "verified_total": 63,
-  "pending_or_unverified": 2,
+  "verified_total": 64,
+  "pending_or_unverified": 1,
   "filtered": {
-    "sample": 13,
+    "sample": 14,
     "baseline_hits": 5,
-    "baseline_misses": 8,
-    "baseline_hit_rate_pct": 38.46
+    "baseline_misses": 9,
+    "baseline_hit_rate_pct": 35.71
   },
   "retained": {
     "sample": 39,
