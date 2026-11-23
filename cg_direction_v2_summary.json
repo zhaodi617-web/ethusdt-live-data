@@ -1,7 +1,7 @@
 {
-  "abstains": 12,
+  "abstains": 13,
   "all_versions_predictions_total": 23,
-  "all_versions_verified_total": 21,
+  "all_versions_verified_total": 22,
   "comparison_with_cg_v1": {
     "both_directional": 1,
     "both_hit": 0,
@@ -11,7 +11,7 @@
     "v2_only_hit": 0
   },
   "direction_hit_rate_pct": 0.0,
-  "evaluated_at_utc": "2026-11-23T17:01:19.151000+00:00",
+  "evaluated_at_utc": "2026-11-23T17:16:11.483000+00:00",
   "flats": 0,
   "history_by_rule_version": {
     "1.0_archived_immutable": {
@@ -26,26 +26,26 @@
       "verified_total": 8
     },
     "1.1_active": {
-      "abstains": 12,
+      "abstains": 13,
       "direction_hit_rate_pct": 0.0,
       "flats": 0,
       "hits": 0,
       "misses": 1,
-      "pending": 2,
+      "pending": 1,
       "predictions_total": 15,
       "unverifiable": 0,
-      "verified_total": 13
+      "verified_total": 14
     }
   },
   "hits": 0,
   "misses": 1,
   "model": "cg_direction_v2_shadow_1.1",
-  "new_predictions": 1,
-  "new_verifications": 0,
-  "pending": 2,
+  "new_predictions": 0,
+  "new_verifications": 1,
+  "pending": 1,
   "predictions_total": 15,
   "rule_version": "1.1",
   "unverifiable": 0,
-  "verified_total": 13,
+  "verified_total": 14,
   "warning": "Prospective research only. 4h rolling taker ratio, exchange source timestamps unverified. Endpoint is next confirmed 15m close, not exact +60m. No fills, fees or net PnL. Do not compare 1.1 and 1.0 without matching forecast times and coverage."
 }
