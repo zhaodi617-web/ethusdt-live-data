@@ -359,3 +359,4 @@
 {"model": "observer_early_v1", "prediction_time": 1795453253585, "result": "ABSTAIN", "rule_version": "1.2", "signal": "UNCERTAIN", "target_time": 1795456853585, "verified_at": 1795456857298}
 {"model": "observer_early_v1", "prediction_time": 1795456857249, "result": "ABSTAIN", "rule_version": "1.2", "signal": "UNCERTAIN", "target_time": 1795460457249, "verified_at": 1795460752039}
 {"model": "observer_early_v1", "prediction_time": 1795460452879, "result": "ABSTAIN", "rule_version": "1.2", "signal": "UNCERTAIN", "target_time": 1795464052879, "verified_at": 1795464052919}
+{"model": "observer_early_v1", "prediction_time": 1795464052860, "reference_price": 1732.32, "result": "MISS", "return_pct": -0.42198, "rule_version": "1.3", "signal": "EARLY_UP", "target_time": 1795467652860, "verification_method": "first_confirmed_15m_close_after_target", "verification_price": 1725.01, "verification_time": 1795468500000, "verified_at": 1795468552297}
