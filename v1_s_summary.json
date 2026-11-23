@@ -1,18 +1,18 @@
 {
   "model": "observer_v1_s_structural_shadow_v0",
   "activated_at_utc": "2026-11-16T02:31:02.658000+00:00",
-  "generated_at_utc": "2026-11-23T21:56:11.211000+00:00",
-  "opportunities": 187,
+  "generated_at_utc": "2026-11-23T22:01:12.557000+00:00",
+  "opportunities": 188,
   "signals": 43,
   "watch": 32,
-  "abstains": 112,
-  "signal_coverage_pct": 22.99,
+  "abstains": 113,
+  "signal_coverage_pct": 22.87,
   "hit": 19,
   "miss": 22,
   "flat": 2,
   "hit_rate_pct": 46.34,
   "pending_signals": 0,
-  "new_predictions": 0,
+  "new_predictions": 1,
   "new_verifications": 0,
   "warning": "Legacy 15m endpoint after 60m target; delay recorded. No exact 1m endpoint, no fills, no PnL."
 }
