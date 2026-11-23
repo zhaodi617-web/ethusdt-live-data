@@ -6,7 +6,7 @@
   "misses": 154,
   "flats": 23,
   "abstains": 45,
-  "pending_or_unverified": 1,
+  "pending_or_unverified": 2,
   "hit_rate_pct": 47.44,
   "history_by_rule_version": {
     "1.0_archived": {
@@ -49,11 +49,11 @@
       "abstains": 0,
       "directional_samples": 0,
       "hit_rate_pct": null,
-      "predictions_total": 1,
+      "predictions_total": 2,
       "verified_total": 0,
-      "pending": 1
+      "pending": 2
     }
   },
-  "updated_at_ms": 1795467371654,
+  "updated_at_ms": 1795467656371,
   "warning": "Research only; next confirmed 15m close after 60m target. No live fills or net PnL."
 }
