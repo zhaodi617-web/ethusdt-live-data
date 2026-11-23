@@ -3,15 +3,15 @@
   "rule_version": "1.2",
   "exchange": "OKX",
   "symbol": "ETH-USDT-SWAP",
-  "prediction_time": 1795456857249,
-  "target_time": 1795460457249,
-  "reference_price": 1741.31,
+  "prediction_time": 1795460452879,
+  "target_time": 1795464052879,
+  "reference_price": 1738.2,
   "reference_type": "ticker_last",
   "signal": "UNCERTAIN",
   "score": 1,
-  "momentum_15m": 0.003641245167572249,
-  "momentum_1h": -0.015123760417020016,
-  "momentum_background_3h": -0.022595779247691516,
+  "momentum_15m": 0.001030405599880213,
+  "momentum_1h": -0.0017336494468969121,
+  "momentum_background_3h": -0.020440410720109714,
   "score_components": {
     "short_15m": 2,
     "older_nonoverlapping_3h": -1,
@@ -19,11 +19,11 @@
     "oi": 0,
     "volume": 0
   },
-  "volume_ratio": 1.24015,
-  "oi_change": -0.004784853930114075,
-  "funding_rate": 4.2715392532e-06,
+  "volume_ratio": 0.37388,
+  "oi_change": -0.004041308795486254,
+  "funding_rate": -2.07950282978e-05,
   "support": 1728.16,
-  "resistance": 1778.44,
+  "resistance": 1768.74,
   "breakout_up": false,
   "breakout_down": false,
   "context": "COUNTERTREND_WATCH",
@@ -32,7 +32,9 @@
     "较早的3小时趋势向下"
   ],
   "counterevidence": [
-    "短期动量与较早趋势冲突，可能出现反转"
+    "近期成交量偏弱",
+    "短期动量与较早趋势冲突，可能出现反转",
+    "上涨尚无放量突破确认"
   ],
   "status": "PENDING",
   "simulation_only": true,
