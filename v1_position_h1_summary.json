@@ -1,10 +1,10 @@
 {
   "model": "v1_position_h1_shadow_v0",
-  "generated_at_utc": "2026-11-23T00:11:34.054411+00:00",
+  "generated_at_utc": "2026-11-23T00:16:21.553335+00:00",
   "prospective_down_signals": 43,
   "new_signals": 0,
-  "verified_signals": 42,
-  "new_verifications": 0,
+  "verified_signals": 43,
+  "new_verifications": 1,
   "by_zone": {
     "BOTTOM_20": {
       "hits": 7,
@@ -22,10 +22,10 @@
     },
     "UPPER_50": {
       "hits": 4,
-      "misses": 10,
+      "misses": 11,
       "flats": 3,
-      "n_directional": 14,
-      "hit_rate_pct": 28.57
+      "n_directional": 15,
+      "hit_rate_pct": 26.67
     }
   },
   "would_filter": {
@@ -37,10 +37,10 @@
   },
   "would_keep": {
     "hits": 12,
-    "misses": 15,
+    "misses": 16,
     "flats": 4,
-    "n_directional": 27,
-    "hit_rate_pct": 44.44
+    "n_directional": 28,
+    "hit_rate_pct": 42.86
   },
   "errors_avoided_if_filtered": 4,
   "correct_signals_missed_if_filtered": 7,
