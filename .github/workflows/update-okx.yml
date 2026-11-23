@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: okx-price-update
+  group: observer-ladder-main-writers
   cancel-in-progress: false
 
 jobs:
