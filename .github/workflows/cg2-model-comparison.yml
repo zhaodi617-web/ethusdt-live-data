@@ -1,0 +1,191 @@
+name: CG2 Three Model Comparison
+on:
+  workflow_run:
+    workflows: ["CG2 Research Telegram"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: cg2-three-model-comparison
+  cancel-in-progress: false
+  queue: max
+jobs:
+  compare:
+    if: >-
+      vars.CG_STORAGE_AUTHORIZED == 'true' &&
+      (github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: zhaodi617-web/observer-ladder-private-data
+          token: ${{ secrets.PRIVATE_DATA_TOKEN }}
+          ref: main
+          path: private-storage
+      - name: Matched research comparison
+        env:
+          CG_TELEGRAM_BOT_TOKEN: ${{ secrets.CG_TELEGRAM_BOT_TOKEN }}
+          CG_TELEGRAM_CHAT_ID: ${{ secrets.CG_TELEGRAM_CHAT_ID }}
+        run: |
+          python3 - <<'PY'
+          import json, math, time
+          from pathlib import Path
+          from collections import Counter
+          from cg_direction_telegram import send_message
+
+          NOW=int(time.time()*1000)
+          H,M=3600000,900000
+          root=Path('private-storage')
+          path=root/'research/cg2_comparison/state.json'
+          path.parent.mkdir(parents=True,exist_ok=True)
+          def load(p): return json.loads(p.read_text())
+          def lines(p): return [json.loads(s) for s in p.read_text().splitlines() if s.strip()]
+          def positive(x):
+              try: return math.isfinite(float(x)) and float(x)>0
+              except (ValueError,TypeError,OverflowError): return False
+          state=load(path) if path.exists() else dict(version='1.0',activation=NOW,rows=[],simulation_only=True)
+          assert state['version']=='1.0' and state['activation']<=NOW
+          rows=state['rows']
+          known={r['time'] for r in rows}
+          assert len(known)==len(rows)
+          def save():
+              tmp=path.with_suffix('.tmp')
+              tmp.write_text(json.dumps(state,ensure_ascii=False,indent=2)+'\n')
+              tmp.replace(path)
+          signals={'EARLY_UP':1,'EARLY_DOWN':-1,'CG_UP':1,'CG_DOWN':-1,'UNCERTAIN':0}
+          def active(history,t,tk,ek):
+              p=max((x for x in history if int(x[tk])<=t),key=lambda x:int(x[tk]),default=None)
+              if not p or t>=int(p[ek]) or not positive(p.get('reference_price')) or p.get('reason')=='MISSING_OR_STALE_SOURCE':
+                  return dict(direction=None,time=None)
+              return dict(direction=signals.get(p.get('signal')),time=int(p[tk]))
+          v1=lines(Path('observer_early_predictions.jsonl'))
+          cg1=lines(root/'models/cg_v1/cg_direction_v1_predictions.jsonl')
+          alerts=load(root/'research/cg2_alert/state.json')
+          assert alerts['version']=='cg2_alert_1.0'
+          observations=lines(root/'models/cg_v2/cg_direction_v2_observations.jsonl')
+          names=('V1','CG1','CG2')
+          for o in sorted(observations,key=lambda x:x['observed_at_ms']):
+              t=int(o['observed_at_ms']); c=o['candidate']
+              if t in known or not state['activation']<=t<=NOW or NOW-t>600000: continue
+              if o.get('model_inputs_usable') is not True or int(alerts['last_observed'])!=t: continue
+              if c.get('rule_version')!='1.2' or not positive(c.get('reference_price')): continue
+              calc=int(c['prediction_time_ms']); target=int(c['target_time_ms'])
+              if not state['activation']<=calc<=t or target!=calc+H or NOW>=target: continue
+              e=max((x for x in alerts['events'] if x['observed_at_ms']<=t<x['target_time_ms']),key=lambda x:x['observed_at_ms'],default=None)
+              a=active(v1,t,'prediction_time','target_time')
+              b=active(cg1,t,'prediction_time_ms','target_time_ms')
+              d=dict(direction=e['direction'] if e else 0,time=e['observed_at_ms'] if e else None)
+              fresh_event=bool(e and e['observed_at_ms']==t)
+              row=dict(time=t,target=target,price=float(c['reference_price']),
+                       models={'V1':a,'CG1':b,'CG2':d},
+                       new_cg2_event=e['id'] if fresh_event else None,
+                       conflict_notice='PENDING' if fresh_event else 'NONE',result=None)
+              rows.append(row); known.add(t)
+          save()
+
+          data=load(Path('okx_candles.json'))
+          assert data['exchange']=='OKX' and data['symbol']=='ETH-USDT-SWAP'
+          bars={}
+          for b in lines(Path('v3_archive_15m.jsonl'))+data['candles_15m']:
+              end=int(b['time'])+M
+              if b.get('confirmed') is True and end<=NOW and positive(b.get('close')):
+                  close=float(b['close'])
+                  if end in bars: assert bars[end]==close
+                  bars[end]=close
+          def outcome(d,change):
+              if d is None: return 'UNAVAILABLE'
+              if d==0: return 'ABSTAIN'
+              if abs(change)<=.0005: return 'FLAT'
+              return 'HIT' if d*change>0 else 'MISS'
+          assert outcome(-1,-.01)=='HIT' and outcome(1,-.01)=='MISS'
+          assert outcome(None,.01)=='UNAVAILABLE' and outcome(0,.01)=='ABSTAIN'
+          def label(d): return {1:'偏上涨',-1:'偏下跌',0:'不确定',None:'无有效预测'}[d]
+          event_map={e['id']:e for e in alerts['events']}
+          errors=0
+          for r in rows:
+              m=r['models']; d=m['CG2']['direction']; t=r['time']; target=r['target']
+              if r['conflict_notice']=='PENDING':
+                  opposite=[n for n in ('V1','CG1') if m[n]['direction']==-d]
+                  e=event_map.get(r['new_cg2_event'])
+                  if not opposite: r['conflict_notice']='NO_CONFLICT'
+                  elif NOW-t>600000: r['conflict_notice']='EXPIRED'
+                  elif e and e['delivery']=='SENT':
+                      msg='\n'.join(['【Observer Ladder｜CG2方向冲突】','编号：CG2-'+str(t),
+                          *[n+'：'+label(m[n]['direction']) for n in names],
+                          '冲突：CG2 vs '+', '.join(opposite),
+                          '同一时点对照，未来60分钟核验；不是交易指令。'])
+                      try: send_message(msg); r['conflict_notice']='SENT'
+                      except Exception: errors+=1
+                  save()
+              if r['result'] is None and NOW>=target+M:
+                  ends=[end for end in bars if target<=end<target+M]
+                  if not ends: continue
+                  end=min(ends); change=bars[end]/r['price']-1
+                  r['result']=dict(end=end,price=bars[end],change=change,
+                                  outcomes={n:outcome(m[n]['direction'],change) for n in names})
+                  if r['new_cg2_event']:
+                      leads={}
+                      for n,h,tk in [('V1',v1,'prediction_time'),('CG1',cg1,'prediction_time_ms')]:
+                          if m[n]['direction']==d:
+                              leads[n]=(m[n]['time']-t)/60000
+                          else:
+                              times=[int(p[tk]) for p in h if t<int(p[tk])<=target and signals.get(p.get('signal'))==d]
+                              leads[n]=(min(times)-t)/60000 if times else None
+                      r['result']['cg2_lead_minutes']=leads
+                  save()
+          verified=[r for r in rows if r['result'] is not None]
+          common=[r for r in verified if all(r['models'][n]['direction'] is not None for n in names)]
+          groups={}
+          for r in sorted(common,key=lambda x:x['time']): groups.setdefault(r['time']//H,r)
+          def stats(rs):
+              out={}
+              for n in names:
+                  c=Counter(r['result']['outcomes'][n] for r in rs)
+                  big=[r for r in rs if abs(r['result']['change'])>=.005]
+                  out[n]=dict(outcomes=dict(c),coverage=(c['HIT']+c['MISS']+c['FLAT'])/len(rs) if rs else None,
+                              hit_rate=c['HIT']/(c['HIT']+c['MISS']) if c['HIT']+c['MISS'] else None,
+                              large_moves=len(big),large_moves_not_hit=sum(r['result']['outcomes'][n]!='HIT' for r in big))
+              return out
+          event_rows=[r for r in common if r['new_cg2_event']]
+          conflicts=[r for r in event_rows if any(r['models'][n]['direction']==-r['models']['CG2']['direction'] for n in ('V1','CG1'))]
+          state['summary']=dict(updated_at_ms=NOW,observations=len(rows),verified=len(verified),common_verified=len(common),
+              source_observations_since_activation=sum(state['activation']<=int(o['observed_at_ms'])<=NOW for o in observations),
+              pending=sum(r['result'] is None and NOW<r['target']+M for r in rows),
+              missing_endpoints=sum(r['result'] is None and NOW>=r['target']+M for r in rows),
+              all_observations=stats(verified),common=stats(common),first_per_hour=stats(list(groups.values())),
+              cg2_new_alerts=stats(event_rows),cg2_conflicts=stats(conflicts),
+              warning='Held active directions, same CG2 observation price and rolling 60m endpoint. Not official original forecasts. Overlapping windows may be correlated. Lead positive means CG2 earlier, null means no match within horizon. Coverage uses recorded observations only.')
+          save()
+          print('CG2 comparison:',len(rows),'verified:',len(verified),'conflicts:',len(conflicts))
+          if errors: raise RuntimeError('Conflict Telegram delivery failed')
+          PY
+      - name: Save private comparison only
+        if: always()
+        working-directory: private-storage
+        run: |
+          set -euo pipefail
+          file=research/cg2_comparison/state.json
+          if [ ! -f "$file" ]; then exit 0; fi
+          git config user.name "Observer Ladder"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- "$file"
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Save matched CG2 model comparison"
+          for attempt in 1 2 3 4 5; do
+            git fetch origin main
+            if ! git rebase origin/main; then
+              git rebase --abort || true
+              exit 1
+            fi
+            if git push origin HEAD:main; then exit 0; fi
+            sleep 3
+          done
+          exit 1
