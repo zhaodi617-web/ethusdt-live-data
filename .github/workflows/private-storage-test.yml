@@ -1,0 +1,35 @@
+name: Private Storage Connection Test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Connect private storage
+        uses: actions/checkout@v4
+        with:
+          repository: zhaodi617-web/observer-ladder-private-data
+          token: ${{ secrets.PRIVATE_DATA_TOKEN }}
+          path: private-storage
+
+      - name: Test private storage write
+        working-directory: private-storage
+        run: |
+          git config user.name "Observer Ladder"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          printf 'Connection successful\nUTC: %s\n' \
+            "$(date -u +%FT%TZ)" > connection_test.txt
+
+          git add connection_test.txt
+          git commit -m "Verify private storage connection"
+          git push origin HEAD:main
+
+          echo "Private storage write successful"
