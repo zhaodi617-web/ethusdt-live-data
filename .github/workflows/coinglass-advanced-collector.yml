@@ -1,0 +1,86 @@
+name: CoinGlass Advanced Collector
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '1-59/5 * * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: coinglass-advanced-collector
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Check collector syntax
+        run: |
+          python -m py_compile fetch_coinglass_advanced.py
+
+      - name: Collect advanced CoinGlass data
+        env:
+          COINGLASS_API_KEY: ${{ secrets.COINGLASS_API_KEY }}
+        run: |
+          python fetch_coinglass_advanced.py
+
+      - name: Validate collected data
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          p = Path("coinglass_advanced_latest.json")
+          data = json.loads(p.read_text())
+
+          print("Status:", data["status"])
+          print("Successful:", data["successful_endpoints"])
+          print("Total:", data["total_endpoints"])
+
+          for name, item in data["data"].items():
+              print(name, item["status"])
+
+          assert data["successful_endpoints"] > 0
+          PY
+
+      - name: Save advanced data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add coinglass_advanced_latest.json
+          git add coinglass_advanced_history.jsonl
+
+          if git diff --cached --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+
+          git commit -m "Update CoinGlass advanced data"
+
+          for attempt in 1 2 3 4 5; do
+            if git pull --rebase origin main && git push origin HEAD:main; then
+              echo "Advanced data saved"
+              exit 0
+            fi
+
+            git rebase --abort 2>/dev/null || true
+            sleep $((attempt * 5))
+          done
+
+          echo "Unable to save data"
+          exit 1
