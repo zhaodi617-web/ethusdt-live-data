@@ -1,10 +1,10 @@
 {
   "model": "v1_position_h1_shadow_v0",
-  "generated_at_utc": "2026-11-24T20:11:24.403219+00:00",
+  "generated_at_utc": "2026-11-24T20:16:31.259798+00:00",
   "prospective_down_signals": 60,
   "new_signals": 0,
-  "verified_signals": 58,
-  "new_verifications": 0,
+  "verified_signals": 59,
+  "new_verifications": 1,
   "by_zone": {
     "BOTTOM_20": {
       "hits": 10,
@@ -14,11 +14,11 @@
       "hit_rate_pct": 55.56
     },
     "MIDDLE_20_50": {
-      "hits": 10,
+      "hits": 11,
       "misses": 7,
       "flats": 2,
-      "n_directional": 17,
-      "hit_rate_pct": 58.82
+      "n_directional": 18,
+      "hit_rate_pct": 61.11
     },
     "UPPER_50": {
       "hits": 7,
@@ -36,11 +36,11 @@
     "hit_rate_pct": 55.56
   },
   "would_keep": {
-    "hits": 17,
+    "hits": 18,
     "misses": 18,
     "flats": 5,
-    "n_directional": 35,
-    "hit_rate_pct": 48.57
+    "n_directional": 36,
+    "hit_rate_pct": 50.0
   },
   "errors_avoided_if_filtered": 8,
   "correct_signals_missed_if_filtered": 10,
