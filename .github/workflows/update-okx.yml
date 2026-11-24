@@ -41,8 +41,8 @@ jobs:
       - name: Verify baseline predictions
         run: python3 verify_eth.py
 
-      - name: Generate Observer early warning
-        run: python3 observer_early.py
+      - name: Generate Observer early warning and lifecycle observation
+        run: python3 v1_lifecycle_observe.py
 
       - name: Verify Observer predictions
         run: python3 verify_observer.py
@@ -203,7 +203,8 @@ jobs:
             observer_accuracy.json \
             telegram_last_sent.json \
             observer_v2_latest.json \
-            observer_v2_observations.jsonl
+            observer_v2_observations.jsonl \
+            v1_lifecycle_observations.jsonl
           do
             if [ -f "$file" ]; then
               git add "$file"
