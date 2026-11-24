@@ -5,7 +5,14 @@ on:
     workflows: ["CG-Direction V1 Independent Shadow"]
     types: [completed]
     branches: [main]
+
   workflow_dispatch:
+    inputs:
+      test_message:
+        description: "Send a CG1 Telegram test message"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -42,6 +49,25 @@ jobs:
 
       - name: Validate notifier syntax
         run: python3 -m py_compile cg_direction_telegram.py
+
+      - name: Test CG1 Telegram connection
+        if: github.event_name == 'workflow_dispatch' && inputs.test_message
+        env:
+          CG_TELEGRAM_BOT_TOKEN: ${{ secrets.CG_TELEGRAM_BOT_TOKEN }}
+          CG_TELEGRAM_CHAT_ID: ${{ secrets.CG_TELEGRAM_CHAT_ID }}
+        run: |
+          python3 - <<'PY'
+          import cg_direction_telegram as notifier
+
+          notifier.send_message(
+              "【Observer Ladder｜CG1 系统测试】\n\n"
+              "Telegram 通知连接正常。\n"
+              "此消息仅用于验证通知系统，"
+              "不是方向预测或交易信号。"
+          )
+
+          print("CG1 Telegram test delivery accepted")
+          PY
 
       - name: Prepare private notification workspace
         run: |
@@ -134,6 +160,149 @@ jobs:
           )
           PY
 
+      - name: Diagnose CG1 notification eligibility
+        run: |
+          cd "$RUNNER_TEMP/cg_v1_notify"
+
+          python3 - <<'PY'
+          import os
+          import sys
+          import time
+
+          sys.path.insert(
+              0, os.environ["GITHUB_WORKSPACE"]
+          )
+
+          import cg_direction_telegram as n
+
+          now = int(time.time() * 1000)
+
+          predictions = [
+              p for p in n.read_jsonl(n.PREDICTIONS)
+              if p.get("model") == "cg_direction_v1"
+          ]
+
+          verifications = [
+              v for v in n.read_jsonl(n.VERIFICATIONS)
+              if v.get("model") == "cg_direction_v1"
+          ]
+
+          sent = set(
+              n.load_state().get("sent_events", [])
+          )
+
+          def prediction_status(p):
+              if p.get("signal") not in n.VALID_SIGNALS:
+                  if p.get("reason") == "MISSING_OR_STALE_SOURCE":
+                      return "MISSING_OR_STALE_SOURCE"
+                  return "NON_DIRECTIONAL"
+
+              if p.get("reference_price") is None:
+                  return "MISSING_REFERENCE_PRICE"
+
+              ts = int(p["prediction_time_ms"])
+              event_id = "prediction:" + str(ts)
+
+              if event_id in sent:
+                  return "ALREADY_SENT"
+
+              age = now - ts
+
+              if age < 0:
+                  return "FUTURE_TIMESTAMP"
+
+              if age > n.PREDICTION_AGE_MS:
+                  return "EXPIRED_UNSENT"
+
+              return "ELIGIBLE_UNSENT"
+
+          def verification_status(v):
+              if v.get("signal") not in n.VALID_SIGNALS:
+                  return "NON_DIRECTIONAL"
+
+              ts = int(v["prediction_time_ms"])
+              event_id = "verification:" + str(ts)
+
+              if event_id in sent:
+                  return "ALREADY_SENT"
+
+              created = int(v.get("verified_at_ms", 0))
+
+              if created <= 0:
+                  return "MISSING_VERIFICATION_TIMESTAMP"
+
+              age = now - created
+
+              if age < 0:
+                  return "FUTURE_TIMESTAMP"
+
+              if age > n.VERIFICATION_AGE_MS:
+                  return "EXPIRED_UNSENT"
+
+              return "ELIGIBLE_UNSENT"
+
+          if predictions:
+              latest = max(
+                  predictions,
+                  key=lambda p: int(p["prediction_time_ms"])
+              )
+
+              print(
+                  "Latest prediction notification status:",
+                  prediction_status(latest)
+              )
+          else:
+              print("No prediction records")
+
+          if verifications:
+              latest = max(
+                  verifications,
+                  key=lambda v: int(v.get("verified_at_ms", 0))
+              )
+
+              print(
+                  "Latest verification notification status:",
+                  verification_status(latest)
+              )
+          else:
+              print("No verification records")
+
+          events = n.collect_events(now)
+
+          eligible = sum(
+              event_id not in sent
+              for _, event_id, _ in events
+          )
+
+          duplicates = sum(
+              event_id in sent
+              for _, event_id, _ in events
+          )
+
+          window = 6 * 60 * 60 * 1000
+
+          expired_predictions = sum(
+              0 <= now - int(p["prediction_time_ms"]) <= window
+              and prediction_status(p) == "EXPIRED_UNSENT"
+              for p in predictions
+          )
+
+          expired_verifications = sum(
+              0 <= now - int(v.get("verified_at_ms", 0)) <= window
+              and verification_status(v) == "EXPIRED_UNSENT"
+              for v in verifications
+          )
+
+          print("Prediction records:", len(predictions))
+          print("Verification records:", len(verifications))
+          print("Eligible new notifications:", eligible)
+          print("Duplicates suppressed:", duplicates)
+          print("Expired unsent predictions in 6h:", expired_predictions)
+          print("Expired unsent verifications in 6h:", expired_verifications)
+
+          print("CG1 notification diagnosis completed")
+          PY
+
       - name: Send independent CG research alerts
         env:
           CG_TELEGRAM_BOT_TOKEN: ${{ secrets.CG_TELEGRAM_BOT_TOKEN }}
@@ -221,7 +390,7 @@ jobs:
             fi
 
             if git push origin HEAD:main; then
-              echo "Private CG notification state saved"
+              echo "Private notification state saved"
               exit 0
             fi
 
