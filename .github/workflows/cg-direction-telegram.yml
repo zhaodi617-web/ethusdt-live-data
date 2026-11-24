@@ -8,82 +8,231 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: cg-direction-telegram-independent
   cancel-in-progress: false
+  queue: max
 
 jobs:
   notify:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    if: >-
+      vars.CG_STORAGE_AUTHORIZED == 'true' &&
+      (github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success')
+
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
     steps:
-      - name: Checkout latest main
+      - name: Checkout public research code
         uses: actions/checkout@v4
         with:
           ref: main
-          persist-credentials: true
+          persist-credentials: false
+
+      - name: Checkout private storage
+        uses: actions/checkout@v4
+        with:
+          repository: zhaodi617-web/observer-ladder-private-data
+          ref: main
+          token: ${{ secrets.PRIVATE_DATA_TOKEN }}
+          path: private-storage
 
       - name: Validate notifier syntax
         run: python3 -m py_compile cg_direction_telegram.py
+
+      - name: Prepare private notification workspace
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import shutil
+          from pathlib import Path
+
+          root = Path(".")
+          private = root / "private-storage" / "models" / "cg_v1"
+          work = Path(os.environ["RUNNER_TEMP"]) / "cg_v1_notify"
+
+          private.mkdir(parents=True, exist_ok=True)
+          work.mkdir(parents=True, exist_ok=True)
+
+          names = [
+              "cg_direction_v1_predictions.jsonl",
+              "cg_direction_v1_verifications.jsonl"
+          ]
+
+          present = [
+              (private / name).exists()
+              for name in names
+          ]
+
+          if any(present) and not all(present):
+              raise RuntimeError(
+                  "Incomplete private prediction history"
+              )
+
+          source = private if all(present) else root
+
+          for name in names:
+              if not (source / name).exists():
+                  raise RuntimeError(
+                      "Required prediction history missing"
+                  )
+
+              shutil.copy2(
+                  source / name,
+                  work / name
+              )
+
+          print(
+              "Prediction source:",
+              "PRIVATE" if all(present)
+              else "PUBLIC_TRANSITION"
+          )
+
+          state_name = "cg_direction_telegram_state.json"
+          sent = set()
+
+          for path in (
+              root / state_name,
+              private / state_name
+          ):
+              if path.exists():
+                  state = json.loads(
+                      path.read_text(encoding="utf-8")
+                  )
+
+                  events = state["sent_events"]
+
+                  assert isinstance(events, list)
+                  assert all(
+                      isinstance(x, str)
+                      for x in events
+                  )
+
+                  sent.update(events)
+
+          payload = {
+              "sent_events": sorted(sent)
+          }
+
+          (work / state_name).write_text(
+              json.dumps(payload, indent=2) + "\n",
+              encoding="utf-8"
+          )
+
+          (work / "previous_state.json").write_text(
+              json.dumps(payload),
+              encoding="utf-8"
+          )
+
+          print(
+              "Existing notification IDs preserved:",
+              len(sent)
+          )
+          PY
 
       - name: Send independent CG research alerts
         env:
           CG_TELEGRAM_BOT_TOKEN: ${{ secrets.CG_TELEGRAM_BOT_TOKEN }}
           CG_TELEGRAM_CHAT_ID: ${{ secrets.CG_TELEGRAM_CHAT_ID }}
-        run: python3 cg_direction_telegram.py
-
-      - name: Save CG Telegram deduplication state
-        shell: bash
         run: |
           set -euo pipefail
 
-          if [ ! -f cg_direction_telegram_state.json ]; then
-            echo "No new CG notification state"
-            exit 0
+          cd "$RUNNER_TEMP/cg_v1_notify"
+
+          if python3 "$GITHUB_WORKSPACE/cg_direction_telegram.py" \
+              > "$RUNNER_TEMP/cg_v1_notify.log" 2>&1; then
+            echo "CG private notifier completed"
+          else
+            echo "CG notifier failed"
+            exit 1
           fi
 
-          git config user.name "github-actions[bot]"
+      - name: Validate and prepare notification state
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import shutil
+          from pathlib import Path
+
+          work = Path(os.environ["RUNNER_TEMP"]) / "cg_v1_notify"
+
+          name = "cg_direction_telegram_state.json"
+
+          previous = set(
+              json.loads(
+                  (work / "previous_state.json").read_text()
+              )["sent_events"]
+          )
+
+          current = set(
+              json.loads(
+                  (work / name).read_text()
+              )["sent_events"]
+          )
+
+          assert previous.issubset(current)
+
+          destination = (
+              Path("private-storage")
+              / "models"
+              / "cg_v1"
+              / name
+          )
+
+          shutil.copy2(
+              work / name,
+              destination
+          )
+
+          print("Notification history validation passed")
+          print("New notification IDs:", len(current - previous))
+          print("Total preserved IDs:", len(current))
+          PY
+
+      - name: Save private notification state
+        working-directory: private-storage
+        run: |
+          set -euo pipefail
+
+          git config user.name "Observer Ladder"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add cg_direction_telegram_state.json
+          git add models/cg_v1/cg_direction_telegram_state.json
 
           if git diff --cached --quiet; then
-            echo "No new notification events"
+            echo "No new notification state"
             exit 0
           fi
 
-          git commit -m "Record CG Telegram notifications"
+          git commit -m "Save private CG notification state"
 
-          pushed=false
-
-          for attempt in $(seq 1 12); do
+          for attempt in 1 2 3 4 5; do
             git fetch origin main
 
             if ! git rebase origin/main; then
               git rebase --abort || true
-              echo "State rebase conflict"
+              echo "State conflict; no records overwritten"
               exit 1
             fi
 
             if git push origin HEAD:main; then
-              pushed=true
-              break
+              echo "Private CG notification state saved"
+              exit 0
             fi
 
-            sleep 2
+            sleep 3
           done
 
-          if [ "$pushed" != true ]; then
-            echo "Failed to persist CG notification state"
-            exit 1
-          fi
+          echo "Private notification persistence failed"
+          exit 1
 
-      - name: Research notification status
+      - name: Clean temporary notification workspace
+        if: always()
         run: |
-          echo "CG Telegram independent notifier completed"
-          echo "Original V1 and V1-CG untouched"
-          echo "No live trading"
+          rm -rf "$RUNNER_TEMP/cg_v1_notify"
+          rm -f "$RUNNER_TEMP/cg_v1_notify.log"
