@@ -2,6 +2,8 @@ name: CoinGlass Advanced Collector
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "4-59/5 * * * *"
 
 permissions:
   contents: read
@@ -12,13 +14,15 @@ concurrency:
 
 jobs:
   collect:
+    if: vars.CG_STORAGE_AUTHORIZED == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
 
     steps:
       - name: Checkout public research code
         uses: actions/checkout@v4
         with:
+          ref: main
           persist-credentials: false
 
       - name: Checkout private storage
@@ -38,21 +42,7 @@ jobs:
           python -m py_compile fetch_coinglass_advanced.py
           python -m py_compile coinglass_advanced_features.py
 
-      - name: Verify storage readiness
-        run: |
-          test -d private-storage/.git
-          echo "Private storage connection ready"
-
-      - name: Check data storage authorization
-        env:
-          STORAGE_AUTHORIZED: ${{ vars.CG_STORAGE_AUTHORIZED }}
-        run: |
-          if [ "$STORAGE_AUTHORIZED" != "true" ]; then
-            echo "Waiting for CoinGlass storage authorization"
-            exit 1
-          fi
-
-      - name: Collect and process data
+      - name: Collect advanced market data
         env:
           COINGLASS_API_KEY: ${{ secrets.COINGLASS_API_KEY }}
         run: |
@@ -61,12 +51,39 @@ jobs:
           rm -f coinglass_features_latest.json
           rm -f coinglass_features_history.jsonl
 
-          python fetch_coinglass_advanced.py > /tmp/cg_collect.log 2>&1
-          python coinglass_advanced_features.py > /tmp/cg_features.log 2>&1
+          python fetch_coinglass_advanced.py > "$RUNNER_TEMP/cg_collect.log" 2>&1
 
-          echo "Data processing completed"
+      - name: Validate API collection quality
+        run: |
+          python - <<'PY'
+          import json
+          import time
+          from pathlib import Path
 
-      - name: Prepare private research records
+          raw = json.loads(
+              Path("coinglass_advanced_latest.json").read_text()
+          )
+
+          total = int(raw["total_endpoints"])
+          successful = int(raw["successful_endpoints"])
+          timestamp = int(raw["finished_at_ms"])
+
+          assert total == 7
+          assert 0 < successful <= total
+          assert 0 <= int(time.time() * 1000) - timestamp <= 300000
+
+          print(f"API endpoints available: {successful}/{total}")
+
+          if successful < total:
+              print("Partial data: unavailable inputs must not generate votes")
+          PY
+
+      - name: Generate advanced features
+        run: |
+          python coinglass_advanced_features.py > "$RUNNER_TEMP/cg_features.log" 2>&1
+          echo "Advanced features generated"
+
+      - name: Validate and prepare private records
         run: |
           python - <<'PY'
           import json
@@ -83,9 +100,47 @@ jobs:
               Path("coinglass_features_latest.json").read_text()
           )
 
-          timestamp = raw["finished_at_ms"]
+          timestamp = int(raw["finished_at_ms"])
 
           assert features["source_collected_at_ms"] == timestamp
+          assert features["symbol"] == "ETH"
+          assert features["simulation_only"] is True
+
+          valid = 0
+
+          for interval, duration in (
+              ("30m", 1800000),
+              ("1h", 3600000)
+          ):
+              block = features["features"][interval]
+
+              for metric in ("futures", "spot", "liquidation"):
+                  item = block[metric]
+
+                  if item.get("status") != "OK":
+                      continue
+
+                  close_time = int(item["time"]) + duration
+                  age = timestamp - close_time
+
+                  if 0 <= age <= duration + 600000:
+                      valid += 1
+                  else:
+                      item["status"] = "STALE_OR_INVALID"
+
+              if any(
+                  block[m].get("status") != "OK"
+                  for m in ("futures", "spot")
+              ):
+                  block["flow_relationship"] = "UNAVAILABLE"
+
+          assert valid > 0
+
+          features["quality"] = {
+              "successful_endpoints": raw["successful_endpoints"],
+              "total_endpoints": raw["total_endpoints"],
+              "valid_closed_period_features": valid
+          }
 
           day = datetime.fromtimestamp(
               timestamp / 1000, timezone.utc
@@ -100,38 +155,53 @@ jobs:
 
               target = folder / f"{timestamp}.json"
 
-              target.write_text(
-                  json.dumps(data, ensure_ascii=False),
-                  encoding="utf-8"
+              assert not target.exists()
+
+              encoded = json.dumps(
+                  data,
+                  ensure_ascii=False,
+                  separators=(",", ":")
               )
+
+              target.write_text(encoded, encoding="utf-8")
 
               latest = root / f"{name}_latest.json"
 
-              latest.write_text(
-                  json.dumps(data, ensure_ascii=False),
-                  encoding="utf-8"
-              )
+              latest.write_text(encoded, encoding="utf-8")
 
-          print("Private research records prepared")
+          print(f"Valid closed-period features: {valid}/6")
+          print("Private advanced records ready")
           PY
 
-      - name: Save to private repository only
+      - name: Save advanced data privately
         working-directory: private-storage
         run: |
           git config user.name "Observer Ladder"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add coinglass/
+          git add coinglass/raw/
+          git add coinglass/features/
+          git add coinglass/raw_latest.json
+          git add coinglass/features_latest.json
 
           if git diff --cached --quiet; then
             echo "No new records"
             exit 0
           fi
 
-          git commit -m "Update private CG research records"
-          git push origin HEAD:main
+          git commit -m "Update private advanced CG data"
 
-          echo "Private storage successful"
+          for attempt in 1 2 3 4 5; do
+            if git pull --rebase origin main && git push origin HEAD:main; then
+              echo "Private advanced storage successful"
+              exit 0
+            fi
+
+            git rebase --abort 2>/dev/null || true
+            sleep 3
+          done
+
+          exit 1
 
       - name: Clean temporary files
         if: always()
@@ -140,5 +210,5 @@ jobs:
           rm -f coinglass_advanced_history.jsonl
           rm -f coinglass_features_latest.json
           rm -f coinglass_features_history.jsonl
-          rm -f /tmp/cg_collect.log
-          rm -f /tmp/cg_features.log
+          rm -f "$RUNNER_TEMP/cg_collect.log"
+          rm -f "$RUNNER_TEMP/cg_features.log"
