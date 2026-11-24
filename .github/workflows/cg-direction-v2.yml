@@ -327,6 +327,20 @@ jobs:
 
           echo "Private V2 research completed"
 
+      - name: Capture independent CG2 observation
+        continue-on-error: true
+        working-directory: private-storage/models/cg_v2
+        env:
+          CG_V2_RULE: "1.2"
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          if python3 -c 'from cg_direction_v2_observe import capture; capture()' > "$RUNNER_TEMP/cg_v2_observation.log" 2>&1; then
+            echo "CG2 observation step completed"
+          else
+            echo "::warning::CG2 observation failed; original research preserved"
+            exit 1
+          fi
+
       - name: Validate V2 research records
         working-directory: private-storage/models/cg_v2
         run: |
@@ -415,7 +429,7 @@ jobs:
           git config user.name "Observer Ladder"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          for name in activation.json predictions.jsonl verifications.jsonl latest.json summary.json; do
+          for name in activation.json predictions.jsonl verifications.jsonl latest.json summary.json observations.jsonl; do
             file="models/cg_v2/cg_direction_v2_$name"
 
             if [ -f "$file" ]; then
@@ -463,3 +477,4 @@ jobs:
           rm -f "$work/cg_direction_v1_predictions.jsonl"
           rm -f "$work/cg_direction_v1_verifications.jsonl"
           rm -f "$RUNNER_TEMP/cg_v2.log"
+          rm -f "$RUNNER_TEMP/cg_v2_observation.log"
