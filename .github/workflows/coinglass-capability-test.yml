@@ -1,0 +1,159 @@
+name: CoinGlass API Capability Test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Audit CoinGlass API capabilities
+        env:
+          COINGLASS_API_KEY: ${{ secrets.COINGLASS_API_KEY }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import json
+          import time
+          import urllib.request
+          import urllib.parse
+          import urllib.error
+
+          key = os.environ.get(
+              "COINGLASS_API_KEY", ""
+          ).strip()
+
+          if not key:
+              raise SystemExit("Missing API key")
+
+          base = "https://open-api-v4.coinglass.com"
+          results = []
+
+          def test(name, path, params):
+              url = base + path + "?" + \
+                  urllib.parse.urlencode(params)
+
+              request = urllib.request.Request(
+                  url,
+                  headers={
+                      "CG-API-KEY": key,
+                      "Accept": "application/json"
+                  }
+              )
+
+              print("\nTEST:", name, flush=True)
+              status = "UNKNOWN"
+
+              try:
+                  with urllib.request.urlopen(
+                      request, timeout=25
+                  ) as response:
+                      payload = json.load(response)
+
+                  code = str(payload.get("code"))
+                  data = payload.get("data")
+
+                  if code == "0" and data:
+                      status = "PASS"
+                      print("PASS: Data available")
+
+                      if isinstance(data, list):
+                          print("Rows:", len(data))
+                          sample = data[-1]
+
+                      elif isinstance(data, dict):
+                          sample = data
+
+                      else:
+                          sample = {}
+
+                      if isinstance(sample, dict):
+                          print(
+                              "Fields:",
+                              list(sample.keys())
+                          )
+
+                  elif code == "0":
+                      status = "EMPTY"
+                      print("EMPTY: No data")
+
+                  else:
+                      status = "REJECTED"
+                      print("API code:", code)
+                      msg = str(
+                          payload.get(
+                              "msg",
+                              payload.get("message", "")
+                          )
+                      )
+                      print(
+                          "Message:",
+                          msg.replace(key, "[REDACTED]")[:200]
+                      )
+
+              except urllib.error.HTTPError as e:
+                  status = "HTTP_" + str(e.code)
+                  print(status)
+
+              except Exception as e:
+                  status = "ERROR"
+                  print(type(e).__name__)
+
+              results.append((name, status))
+              time.sleep(3)
+
+          for market in ("futures", "spot"):
+              for interval in (
+                  "1m", "5m", "15m", "30m", "1h"
+              ):
+                  test(
+                      market + " CVD " + interval,
+                      "/api/" + market +
+                      "/aggregated-cvd/history",
+                      {
+                          "exchange_list": "Binance,OKX",
+                          "symbol": "ETH",
+                          "interval": interval,
+                          "limit": 10,
+                          "unit": "usd"
+                      }
+                  )
+
+          test(
+              "ETH Funding Rate",
+              "/api/futures/funding-rate/exchange-list",
+              {"symbol": "ETH"}
+          )
+
+          for interval in ("5m", "30m", "1h"):
+              test(
+                  "ETH Liquidation " + interval,
+                  "/api/futures/liquidation/aggregated-history",
+                  {
+                      "exchange_list": "Binance,OKX",
+                      "symbol": "ETH",
+                      "interval": interval,
+                      "limit": 10
+                  }
+              )
+
+          print("\n========================")
+          print("COINGLASS CAPABILITY REPORT")
+          print("========================")
+
+          for name, status in results:
+              print(name, ":", status)
+
+          passed = sum(
+              status == "PASS"
+              for _, status in results
+          )
+
+          print("\nAvailable:", passed, "/", len(results))
+          print("No existing models modified.")
+          PY
