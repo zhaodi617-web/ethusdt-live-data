@@ -1,7 +1,7 @@
 {
   "abstains": 21,
   "all_versions_predictions_total": 33,
-  "all_versions_verified_total": 31,
+  "all_versions_verified_total": 32,
   "comparison_with_cg_v1": {
     "both_directional": 1,
     "both_hit": 0,
@@ -10,8 +10,8 @@
     "v1_only_hit": 0,
     "v2_only_hit": 0
   },
-  "direction_hit_rate_pct": 50.0,
-  "evaluated_at_utc": "2026-11-24T03:01:10.048000+00:00",
+  "direction_hit_rate_pct": 66.67,
+  "evaluated_at_utc": "2026-11-24T03:16:15.636000+00:00",
   "flats": 0,
   "history_by_rule_version": {
     "1.0_archived_immutable": {
@@ -27,25 +27,25 @@
     },
     "1.1_active": {
       "abstains": 21,
-      "direction_hit_rate_pct": 50.0,
+      "direction_hit_rate_pct": 66.67,
       "flats": 0,
-      "hits": 1,
+      "hits": 2,
       "misses": 1,
-      "pending": 2,
+      "pending": 1,
       "predictions_total": 25,
       "unverifiable": 0,
-      "verified_total": 23
+      "verified_total": 24
     }
   },
-  "hits": 1,
+  "hits": 2,
   "misses": 1,
   "model": "cg_direction_v2_shadow_1.1",
-  "new_predictions": 1,
-  "new_verifications": 0,
-  "pending": 2,
+  "new_predictions": 0,
+  "new_verifications": 1,
+  "pending": 1,
   "predictions_total": 25,
   "rule_version": "1.1",
   "unverifiable": 0,
-  "verified_total": 23,
+  "verified_total": 24,
   "warning": "Prospective research only. 4h rolling taker ratio, exchange source timestamps unverified. Endpoint is next confirmed 15m close, not exact +60m. No fills, fees or net PnL. Do not compare 1.1 and 1.0 without matching forecast times and coverage."
 }
