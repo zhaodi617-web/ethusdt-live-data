@@ -8,24 +8,37 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: observer-v1-cg-independent
   cancel-in-progress: false
+  queue: max
 
 jobs:
   v1-cg:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    if: >-
+      vars.CG_STORAGE_AUTHORIZED == 'true' &&
+      (github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success')
+
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
     steps:
-      - name: Checkout latest main
+      - name: Checkout public research code
         uses: actions/checkout@v4
         with:
           ref: main
-          persist-credentials: true
+          persist-credentials: false
+
+      - name: Checkout private storage
+        uses: actions/checkout@v4
+        with:
+          repository: zhaodi617-web/observer-ladder-private-data
+          ref: main
+          token: ${{ secrets.PRIVATE_DATA_TOKEN }}
+          path: private-storage
 
       - name: Check Python syntax
         run: |
@@ -33,97 +46,505 @@ jobs:
           python3 -m py_compile v1_cg_verify.py
           python3 -m py_compile v1_cg_telegram.py
 
+      - name: Prepare private V1-CG workspace
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import shutil
+          import time
+          from pathlib import Path
+
+          root = Path(".")
+          private = root / "private-storage"
+          storage = private / "models" / "v1_cg"
+          work = Path(os.environ["RUNNER_TEMP"]) / "v1_cg"
+
+          storage.mkdir(parents=True, exist_ok=True)
+          work.mkdir(parents=True, exist_ok=True)
+
+          names = (
+              "v1_cg_protocol.json",
+              "v1_cg_predictions.jsonl",
+              "v1_cg_verifications.jsonl",
+              "v1_cg_summary.json"
+          )
+
+          present = [
+              (storage / name).exists()
+              for name in names
+          ]
+
+          if any(present) and not all(present):
+              raise RuntimeError(
+                  "Incomplete private V1-CG storage"
+              )
+
+          source = storage if all(present) else root
+
+          def rows(path):
+              return [
+                  json.loads(line)
+                  for line in path.read_text(
+                      encoding="utf-8"
+                  ).splitlines()
+                  if line.strip()
+              ]
+
+          for name in names:
+              assert (source / name).exists()
+
+              shutil.copy2(
+                  source / name,
+                  work / name
+              )
+
+              shutil.copy2(
+                  work / name,
+                  work / ("before_" + name)
+              )
+
+          histories = {}
+
+          for name in (names[1], names[2]):
+              current = rows(work / name)
+
+              ids = [
+                  int(x["prediction_time"])
+                  for x in current
+              ]
+
+              assert len(ids) == len(set(ids))
+
+              old = root / name
+
+              if old.exists():
+                  previous = rows(old)
+                  assert current[:len(previous)] == previous
+
+              histories[name] = set(ids)
+
+          assert histories[names[2]].issubset(
+              histories[names[1]]
+          )
+
+          print(
+              "V1-CG history source:",
+              "PRIVATE" if all(present)
+              else "PUBLIC_MIGRATION"
+          )
+
+          print(
+              "Historical predictions:",
+              len(histories[names[1]])
+          )
+
+          print(
+              "Historical verifications:",
+              len(histories[names[2]])
+          )
+
+          state_name = "v1_cg_telegram_state.json"
+          sent = set()
+
+          for path in (
+              root / state_name,
+              storage / state_name
+          ):
+              if path.exists():
+                  state = json.loads(path.read_text())
+
+                  sent.update(
+                      state.get("sent_events", [])
+                  )
+
+          state_text = json.dumps(
+              {"sent_events": sorted(sent)},
+              indent=2
+          ) + "\n"
+
+          (work / state_name).write_text(
+              state_text,
+              encoding="utf-8"
+          )
+
+          (work / "before_state.json").write_text(
+              state_text,
+              encoding="utf-8"
+          )
+
+          print(
+              "Existing notification IDs preserved:",
+              len(sent)
+          )
+
+          for name in (
+              "observer_early_predictions.jsonl",
+              "okx_candles.json"
+          ):
+              assert (root / name).exists()
+
+              shutil.copy2(
+                  root / name,
+                  work / name
+              )
+
+          now = int(time.time() * 1000)
+
+          for metric in ("oi", "taker"):
+              name = f"coinglass_{metric}_history.jsonl"
+
+              private_source = (
+                  private / "coinglass" / metric / name
+              )
+
+              assert private_source.exists()
+
+              records = {}
+
+              for path in (root / name, private_source):
+                  if not path.exists():
+                      continue
+
+                  for row in rows(path):
+                      timestamp = int(
+                          row["collected_at_ms"]
+                      )
+
+                      if timestamp in records:
+                          assert records[timestamp] == row
+
+                      records[timestamp] = row
+
+              assert records
+
+              (work / name).write_text(
+                  "".join(
+                      json.dumps(records[t]) + "\n"
+                      for t in sorted(records)
+                  ),
+                  encoding="utf-8"
+              )
+
+              fresh = any(
+                  0 <= now - t <= 1200000
+                  for t in records
+              )
+
+              print(
+                  metric.upper() + ":",
+                  "FRESH" if fresh else "STALE"
+              )
+
+          print("Private V1-CG workspace ready")
+          PY
+
       - name: Run independent V1-CG prediction
-        run: python3 v1_cg_shadow.py
+        run: |
+          cd "$RUNNER_TEMP/v1_cg"
+
+          python3 "$GITHUB_WORKSPACE/v1_cg_shadow.py" \
+            > "$RUNNER_TEMP/v1_cg_prediction.log" 2>&1
+
+          echo "V1-CG prediction processing completed"
 
       - name: Verify 60-minute outcomes
-        run: python3 v1_cg_verify.py
+        run: |
+          cd "$RUNNER_TEMP/v1_cg"
 
-      - name: Save independent research records
-        shell: bash
+          python3 "$GITHUB_WORKSPACE/v1_cg_verify.py" \
+            > "$RUNNER_TEMP/v1_cg_verification.log" 2>&1
+
+          echo "V1-CG verification completed"
+
+      - name: Validate private V1-CG records
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import shutil
+          from pathlib import Path
+
+          work = Path(os.environ["RUNNER_TEMP"]) / "v1_cg"
+          storage = Path("private-storage/models/v1_cg")
+
+          names = (
+              "v1_cg_protocol.json",
+              "v1_cg_predictions.jsonl",
+              "v1_cg_verifications.jsonl",
+              "v1_cg_summary.json"
+          )
+
+          def rows(path):
+              return [
+                  json.loads(line)
+                  for line in path.read_text(
+                      encoding="utf-8"
+                  ).splitlines()
+                  if line.strip()
+              ]
+
+          assert (
+              (work / names[0]).read_bytes()
+              ==
+              (work / ("before_" + names[0])).read_bytes()
+          )
+
+          histories = {}
+
+          for name in (names[1], names[2]):
+              before = rows(work / ("before_" + name))
+              current = rows(work / name)
+
+              assert current[:len(before)] == before
+
+              ids = [
+                  int(x["prediction_time"])
+                  for x in current
+              ]
+
+              assert len(ids) == len(set(ids))
+
+              histories[name] = current
+
+              print(
+                  "New predictions:"
+                  if name == names[1]
+                  else "New verifications:",
+                  len(current) - len(before)
+              )
+
+          predictions = histories[names[1]]
+          verifications = histories[names[2]]
+
+          pred_ids = {
+              int(x["prediction_time"])
+              for x in predictions
+          }
+
+          verify_ids = {
+              int(x["prediction_time"])
+              for x in verifications
+          }
+
+          assert verify_ids.issubset(pred_ids)
+
+          original = {
+              int(x["prediction_time"]): x
+              for x in rows(
+                  work / "observer_early_predictions.jsonl"
+              )
+          }
+
+          before_count = len(
+              rows(work / ("before_" + names[1]))
+          )
+
+          for row in predictions[before_count:]:
+              timestamp = int(row["prediction_time"])
+              source = original[timestamp]
+
+              assert row["model"] == "observer_v1_cg_shadow_v1"
+              assert row["simulation_only"] is True
+
+              assert row["original_v1_signal"] == source["signal"]
+              assert row["reference_price"] == source["reference_price"]
+              assert row["target_time"] == source["target_time"]
+
+              assert (
+                  int(row["target_time"]) - timestamp
+                  == 3600000
+              )
+
+              assert (
+                  0 <= int(row["captured_at_ms"])
+                  - timestamp <= 900000
+              )
+
+              for key in (
+                  "oi_snapshot_time_ms",
+                  "taker_snapshot_time_ms"
+              ):
+                  snapshot = row.get(key)
+
+                  if snapshot is not None:
+                      assert (
+                          0 <= timestamp - int(snapshot)
+                          <= 1200000
+                      )
+
+              if row["status"] == "READY":
+                  assert row["oi_snapshot_time_ms"] is not None
+                  assert row["taker_snapshot_time_ms"] is not None
+
+              print("New V1-CG source status:", row["status"])
+
+          summary = json.loads(
+              (work / names[3]).read_text()
+          )
+
+          assert summary["predictions_total"] == len(predictions)
+          assert summary["verified_total"] == len(verifications)
+
+          for name in names:
+              shutil.copy2(
+                  work / name,
+                  storage / name
+              )
+
+          shutil.copy2(
+              work / "v1_cg_telegram_state.json",
+              storage / "v1_cg_telegram_state.json"
+          )
+
+          print("Historical records preserved")
+          print("Total predictions:", len(predictions))
+          print("Total verifications:", len(verifications))
+          print("V1-CG research validation passed")
+          PY
+
+      - name: Save private V1-CG research
+        working-directory: private-storage
         run: |
           set -euo pipefail
 
-          git config user.name "github-actions[bot]"
+          git config user.name "Observer Ladder"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           for file in \
             v1_cg_protocol.json \
             v1_cg_predictions.jsonl \
             v1_cg_verifications.jsonl \
-            v1_cg_summary.json
+            v1_cg_summary.json \
+            v1_cg_telegram_state.json
           do
-            if [ -f "$file" ]; then
-              git add "$file"
-            fi
+            git add "models/v1_cg/$file"
           done
 
-          if ! git diff --cached --quiet; then
-            git commit -m "Record independent V1-CG research"
-
-            pushed=false
-            for attempt in $(seq 1 12); do
-              git fetch origin main
-              if ! git rebase origin/main; then
-                git rebase --abort || true
-                exit 1
-              fi
-              if git push origin HEAD:main; then
-                pushed=true
-                break
-              fi
-              sleep 2
-            done
-
-            if [ "$pushed" != true ]; then
-              echo "Research persistence failed"
-              exit 1
-            fi
-          fi
-
-      - name: Send V1-CG Telegram research notifications
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python3 v1_cg_telegram.py
-
-      - name: Persist V1-CG Telegram deduplication state
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          if [ ! -f v1_cg_telegram_state.json ]; then
-            echo "No Telegram state changes"
-            exit 0
-          fi
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          git add v1_cg_telegram_state.json
-
           if git diff --cached --quiet; then
-            echo "No new Telegram events"
+            echo "No new V1-CG research records"
             exit 0
           fi
 
-          git commit -m "Persist V1-CG Telegram notification state"
+          git commit -m "Save private V1-CG research"
 
-          pushed=false
           for attempt in $(seq 1 12); do
             git fetch origin main
+
             if ! git rebase origin/main; then
               git rebase --abort || true
+              echo "V1-CG conflict; no records overwritten"
               exit 1
             fi
+
             if git push origin HEAD:main; then
-              pushed=true
-              break
+              echo "Private V1-CG storage successful"
+              exit 0
             fi
+
             sleep 2
           done
 
-          if [ "$pushed" != true ]; then
-            echo "Telegram state persistence failed"
-            exit 1
+          echo "V1-CG persistence failed"
+          exit 1
+
+      - name: Send V1-CG research notifications
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          cd "$RUNNER_TEMP/v1_cg"
+
+          result=0
+
+          python3 "$GITHUB_WORKSPACE/v1_cg_telegram.py" \
+            > "$RUNNER_TEMP/v1_cg_telegram.log" 2>&1 \
+            || result=$?
+
+          echo "$result" > "$RUNNER_TEMP/v1_cg_notify_status"
+
+          if [ "$result" -eq 0 ]; then
+            echo "V1-CG notifier completed"
+          else
+            echo "V1-CG notifier reported an error"
           fi
+
+      - name: Validate notification history
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import shutil
+          from pathlib import Path
+
+          work = Path(os.environ["RUNNER_TEMP"]) / "v1_cg"
+
+          before = set(
+              json.loads(
+                  (work / "before_state.json").read_text()
+              )["sent_events"]
+          )
+
+          path = work / "v1_cg_telegram_state.json"
+
+          current = json.loads(path.read_text())["sent_events"]
+
+          assert len(current) == len(set(current))
+          assert before.issubset(set(current))
+
+          shutil.copy2(
+              path,
+              "private-storage/models/v1_cg/v1_cg_telegram_state.json"
+          )
+
+          print("Notification history validation passed")
+          print("New notification IDs:", len(current) - len(before))
+          print("Total preserved IDs:", len(current))
+          PY
+
+      - name: Persist private notification state
+        working-directory: private-storage
+        run: |
+          set -euo pipefail
+
+          git add models/v1_cg/v1_cg_telegram_state.json
+
+          if git diff --cached --quiet; then
+            echo "No new notification state"
+            exit 0
+          fi
+
+          git commit -m "Persist private V1-CG notification state"
+
+          for attempt in $(seq 1 12); do
+            git fetch origin main
+
+            if ! git rebase origin/main; then
+              git rebase --abort || true
+              echo "Notification state conflict"
+              exit 1
+            fi
+
+            if git push origin HEAD:main; then
+              echo "Private notification state saved"
+              exit 0
+            fi
+
+            sleep 2
+          done
+
+          echo "Notification state persistence failed"
+          exit 1
+
+      - name: Check notification execution result
+        run: |
+          test "$(cat "$RUNNER_TEMP/v1_cg_notify_status")" = "0"
+
+      - name: Clean temporary research workspace
+        if: always()
+        run: |
+          rm -rf "$RUNNER_TEMP/v1_cg"
+          rm -f "$RUNNER_TEMP/v1_cg_prediction.log"
+          rm -f "$RUNNER_TEMP/v1_cg_verification.log"
+          rm -f "$RUNNER_TEMP/v1_cg_telegram.log"
+          rm -f "$RUNNER_TEMP/v1_cg_notify_status"
