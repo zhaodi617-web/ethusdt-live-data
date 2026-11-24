@@ -1,9 +1,9 @@
 {
   "model": "v1_lifecycle_shadow_v0",
-  "updated_at_utc": "2026-11-24T14:12:04.734011+00:00",
+  "updated_at_utc": "2026-11-24T14:16:31.508200+00:00",
   "first_eligible_prediction_ms": 1794960000000,
-  "new_results": 0,
-  "total_results": 515,
+  "new_results": 1,
+  "total_results": 516,
   "by_horizon": {
     "15": {
       "hits": 60,
@@ -28,10 +28,10 @@
     },
     "60": {
       "hits": 59,
-      "misses": 60,
+      "misses": 61,
       "flats": 9,
-      "directional_samples": 119,
-      "hit_rate_pct": 49.58
+      "directional_samples": 120,
+      "hit_rate_pct": 49.17
     }
   },
   "five_minute_status": "NOT_SUPPORTED_BY_15M_CANDLES",
