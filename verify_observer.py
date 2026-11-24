@@ -17,7 +17,7 @@ ACCURACY = Path("observer_accuracy.json")
 
 M15 = 900_000
 FLAT = 0.0005
-RULE = "1.2"
+RULE = "1.0_restored_2026_11_24"
 
 
 def read_lines(path):
@@ -282,7 +282,7 @@ def run(now_ms=None):
             ensure_ascii=False,
             indent=2,
         ) + "\n",
-        encoding="utf-8",
+        encoding="utf-8"
     )
 
     print("New Observer verifications:", len(added))
