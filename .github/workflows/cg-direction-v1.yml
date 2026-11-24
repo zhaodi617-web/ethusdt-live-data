@@ -6,101 +6,404 @@ on:
     types: [completed]
     branches: [main]
 
-  schedule:
-    - cron: "9-59/5 * * * *"
-
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: cg-direction-v1-independent
   cancel-in-progress: false
+  queue: max
 
 jobs:
   predict:
     if: >-
-      github.event_name != 'workflow_run' ||
-      github.event.workflow_run.conclusion == 'success'
+      vars.CG_STORAGE_AUTHORIZED == 'true' &&
+      (github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success')
 
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
     steps:
-      - name: Checkout latest main
+      - name: Checkout public research code
         uses: actions/checkout@v4
         with:
           ref: main
-          persist-credentials: true
+          persist-credentials: false
+
+      - name: Checkout private storage
+        uses: actions/checkout@v4
+        with:
+          repository: zhaodi617-web/observer-ladder-private-data
+          ref: main
+          token: ${{ secrets.PRIVATE_DATA_TOKEN }}
+          path: private-storage
 
       - name: Validate Python syntax
         run: |
           python3 -m py_compile cg_direction_v1.py
           python3 -m py_compile cg_direction_v1_verify.py
 
+      - name: Prepare private CG V1 workspace
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import shutil
+          import time
+          from pathlib import Path
+
+          root = Path(".")
+          private = root / "private-storage"
+          storage = private / "models" / "cg_v1"
+          work = Path(os.environ["RUNNER_TEMP"]) / "cg_v1"
+
+          storage.mkdir(parents=True, exist_ok=True)
+          work.mkdir(parents=True, exist_ok=True)
+
+          names = (
+              "cg_direction_v1_activation.json",
+              "cg_direction_v1_predictions.jsonl",
+              "cg_direction_v1_verifications.jsonl",
+              "cg_direction_v1_latest.json",
+              "cg_direction_v1_summary.json"
+          )
+
+          present = [
+              (storage / name).exists()
+              for name in names
+          ]
+
+          if any(present) and not all(present):
+              raise RuntimeError(
+                  "Incomplete private CG V1 storage"
+              )
+
+          source_dir = storage if all(present) else root
+
+          for name in names:
+              source = source_dir / name
+
+              if not source.exists():
+                  raise RuntimeError(
+                      "Required historical CG V1 file missing"
+                  )
+
+              shutil.copy2(source, work / name)
+
+          def read_rows(path):
+              return [
+                  json.loads(line)
+                  for line in path.read_text(
+                      encoding="utf-8"
+                  ).splitlines()
+                  if line.strip()
+              ]
+
+          history_names = (
+              "cg_direction_v1_predictions.jsonl",
+              "cg_direction_v1_verifications.jsonl"
+          )
+
+          histories = {}
+
+          for name in history_names:
+              rows = read_rows(work / name)
+
+              ids = [
+                  int(row["prediction_time_ms"])
+                  for row in rows
+              ]
+
+              assert len(ids) == len(set(ids))
+
+              old = root / name
+
+              if old.exists():
+                  previous = read_rows(old)
+
+                  assert rows[:len(previous)] == previous
+
+              histories[name] = rows
+
+              shutil.copy2(
+                  work / name,
+                  work / ("before_" + name)
+              )
+
+          pred_ids = {
+              int(row["prediction_time_ms"])
+              for row in histories[history_names[0]]
+          }
+
+          verify_ids = {
+              int(row["prediction_time_ms"])
+              for row in histories[history_names[1]]
+          }
+
+          assert verify_ids.issubset(pred_ids)
+
+          shutil.copy2(
+              work / names[0],
+              work / ("before_" + names[0])
+          )
+
+          print(
+              "CG V1 history source:",
+              "PRIVATE" if all(present)
+              else "PUBLIC_MIGRATION"
+          )
+
+          print("Historical predictions:", len(pred_ids))
+          print("Historical verifications:", len(verify_ids))
+
+          for name in (
+              "okx_latest.json",
+              "okx_candles.json"
+          ):
+              assert (root / name).exists()
+
+              shutil.copy2(
+                  root / name,
+                  work / name
+              )
+
+          now = int(time.time() * 1000)
+
+          for metric in ("oi", "taker"):
+              name = f"coinglass_{metric}_history.jsonl"
+
+              private_source = (
+                  private / "coinglass" / metric / name
+              )
+
+              assert private_source.exists()
+
+              records = {}
+
+              for path in (root / name, private_source):
+                  if not path.exists():
+                      continue
+
+                  for row in read_rows(path):
+                      timestamp = int(
+                          row["collected_at_ms"]
+                      )
+
+                      if timestamp in records:
+                          assert records[timestamp] == row
+
+                      records[timestamp] = row
+
+              assert records
+
+              (work / name).write_text(
+                  "".join(
+                      json.dumps(records[t]) + "\n"
+                      for t in sorted(records)
+                  ),
+                  encoding="utf-8"
+              )
+
+              eligible = [
+                  t for t in records
+                  if 0 <= now - t <= 1200000
+              ]
+
+              print(
+                  metric.upper() + ":",
+                  "FRESH" if eligible else "STALE"
+              )
+
+          print("Private CG V1 workspace ready")
+          PY
+
       - name: Generate independent CG direction
-        run: python3 cg_direction_v1.py
+        run: |
+          cd "$RUNNER_TEMP/cg_v1"
+
+          python3 "$GITHUB_WORKSPACE/cg_direction_v1.py" \
+            > "$RUNNER_TEMP/cg_v1_prediction.log" 2>&1
+
+          echo "CG V1 prediction processing completed"
 
       - name: Verify CG direction predictions
-        run: python3 cg_direction_v1_verify.py
+        run: |
+          cd "$RUNNER_TEMP/cg_v1"
 
-      - name: Save independent CG records
+          python3 "$GITHUB_WORKSPACE/cg_direction_v1_verify.py" \
+            > "$RUNNER_TEMP/cg_v1_verification.log" 2>&1
+
+          echo "CG V1 verification completed"
+
+      - name: Validate preserved CG V1 research
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import shutil
+          from pathlib import Path
+
+          work = Path(os.environ["RUNNER_TEMP"]) / "cg_v1"
+
+          storage = Path(
+              "private-storage/models/cg_v1"
+          )
+
+          names = (
+              "cg_direction_v1_activation.json",
+              "cg_direction_v1_predictions.jsonl",
+              "cg_direction_v1_verifications.jsonl",
+              "cg_direction_v1_latest.json",
+              "cg_direction_v1_summary.json"
+          )
+
+          def read_rows(path):
+              return [
+                  json.loads(line)
+                  for line in path.read_text(
+                      encoding="utf-8"
+                  ).splitlines()
+                  if line.strip()
+              ]
+
+          assert (
+              (work / names[0]).read_bytes()
+              ==
+              (work / ("before_" + names[0])).read_bytes()
+          )
+
+          histories = {}
+
+          for name in (names[1], names[2]):
+              previous = read_rows(
+                  work / ("before_" + name)
+              )
+
+              current = read_rows(work / name)
+
+              assert current[:len(previous)] == previous
+
+              ids = [
+                  int(row["prediction_time_ms"])
+                  for row in current
+              ]
+
+              assert len(ids) == len(set(ids))
+
+              histories[name] = current
+
+              print(
+                  "New predictions:"
+                  if name == names[1]
+                  else "New verifications:",
+                  len(current) - len(previous)
+              )
+
+          predictions = histories[names[1]]
+          verifications = histories[names[2]]
+
+          pred_ids = {
+              int(row["prediction_time_ms"])
+              for row in predictions
+          }
+
+          verify_ids = {
+              int(row["prediction_time_ms"])
+              for row in verifications
+          }
+
+          assert verify_ids.issubset(pred_ids)
+
+          for row in predictions:
+              assert row["model"] == "cg_direction_v1"
+
+              assert (
+                  int(row["target_time_ms"])
+                  - int(row["prediction_time_ms"])
+                  == 3600000
+              )
+
+              assert row["simulation_only"] is True
+              assert row["trade_execution"] is False
+
+          summary = json.loads(
+              (work / names[4]).read_text()
+          )
+
+          assert summary["predictions_total"] == len(predictions)
+          assert summary["verified_total"] == len(verifications)
+
+          latest = json.loads(
+              (work / names[3]).read_text()
+          )
+
+          if predictions:
+              assert latest == predictions[-1]
+
+          for name in names:
+              shutil.copy2(
+                  work / name,
+                  storage / name
+              )
+
+          print("Historical records preserved")
+          print("Total predictions:", len(predictions))
+          print("Total verifications:", len(verifications))
+          print("CG V1 research validation passed")
+          PY
+
+      - name: Save private CG V1 research
+        working-directory: private-storage
         shell: bash
         run: |
           set -euo pipefail
 
-          git config user.name "github-actions[bot]"
+          git config user.name "Observer Ladder"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          for file in \
-            cg_direction_v1_activation.json \
-            cg_direction_v1_predictions.jsonl \
-            cg_direction_v1_latest.json \
-            cg_direction_v1_verifications.jsonl \
-            cg_direction_v1_summary.json
+          for name in \
+            activation.json \
+            predictions.jsonl \
+            verifications.jsonl \
+            latest.json \
+            summary.json
           do
-            if [ -f "$file" ]; then
-              git add "$file"
-            fi
+            git add "models/cg_v1/cg_direction_v1_$name"
           done
 
           if git diff --cached --quiet; then
-            echo "No new CG records"
+            echo "No new CG V1 research records"
             exit 0
           fi
 
-          git commit -m "Record CG-Direction V1 research"
-
-          pushed=false
+          git commit -m "Save private CG V1 research"
 
           for attempt in $(seq 1 12); do
             git fetch origin main
 
             if ! git rebase origin/main; then
               git rebase --abort || true
-              echo "Rebase conflict; no records overwritten"
+              echo "CG V1 conflict; no records overwritten"
               exit 1
             fi
 
             if git push origin HEAD:main; then
-              pushed=true
-              break
+              echo "Private CG V1 storage successful"
+              exit 0
             fi
 
             sleep 2
           done
 
-          if [ "$pushed" != true ]; then
-            echo "CG research persistence failed"
-            exit 1
-          fi
+          echo "CG V1 persistence failed"
+          exit 1
 
-      - name: Research status
+      - name: Clean temporary research workspace
+        if: always()
         run: |
-          echo "CG-Direction V1 independent research"
-          echo "Prediction and verification enabled"
-          echo "Triggered by successful OKX update or schedule"
-          echo "CG Telegram handled by independent workflow"
-          echo "Original V1 and V1-CG untouched"
-          echo "No live trading"
+          rm -rf "$RUNNER_TEMP/cg_v1"
+          rm -f "$RUNNER_TEMP/cg_v1_prediction.log"
+          rm -f "$RUNNER_TEMP/cg_v1_verification.log"
