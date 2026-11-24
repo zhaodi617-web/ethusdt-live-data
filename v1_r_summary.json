@@ -1,10 +1,10 @@
 {
   "model": "observer_v1_r_shadow_v0",
   "rule_version": "1.1_long_horizon",
-  "evaluated_at_utc": "2026-11-24T06:11:03.705000+00:00",
+  "evaluated_at_utc": "2026-11-24T06:16:05.989000+00:00",
   "predictions_total": 313,
   "new_predictions": 0,
-  "new_verifications": 0,
+  "new_verifications": 3,
   "by_horizon": {
     "15": {
       "hits": 124,
@@ -29,24 +29,24 @@
     },
     "60": {
       "hits": 103,
-      "misses": 121,
+      "misses": 122,
       "flats": 29,
       "abstains": 58,
-      "direction_hit_rate_pct": 45.98
+      "direction_hit_rate_pct": 45.78
     },
     "120": {
       "hits": 3,
-      "misses": 2,
+      "misses": 3,
       "flats": 0,
       "abstains": 2,
-      "direction_hit_rate_pct": 60.0
+      "direction_hit_rate_pct": 50.0
     },
     "180": {
       "hits": 5,
-      "misses": 1,
+      "misses": 2,
       "flats": 0,
       "abstains": 0,
-      "direction_hit_rate_pct": 83.33
+      "direction_hit_rate_pct": 71.43
     }
   },
   "warning": "Research only. V1.3 untouched. 120m/180m are prospective experiments. Verification may lag target by up to 15m. No fills or net PnL."
