@@ -1,19 +1,10 @@
 name: CoinGlass ETH Taker Collector
 
 on:
-  workflow_run:
-    workflows:
-      - Update OKX ETH Price
-    types:
-      - completed
-    branches:
-      - main
-  schedule:
-    - cron: "3-59/5 * * * *"
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: coinglass-eth-taker-collector
@@ -21,77 +12,102 @@ concurrency:
 
 jobs:
   collect:
-    if: >-
-      github.event_name != 'workflow_run' ||
-      github.event.workflow_run.conclusion == 'success'
+    if: vars.CG_STORAGE_AUTHORIZED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
     steps:
-      - name: Checkout latest main
+      - name: Checkout public research code
         uses: actions/checkout@v4
         with:
-          ref: main
-          persist-credentials: true
+          persist-credentials: false
 
-      - name: Validate Python syntax
-        run: python3 -m py_compile fetch_coinglass_taker.py
+      - name: Checkout private storage
+        uses: actions/checkout@v4
+        with:
+          repository: zhaodi617-web/observer-ladder-private-data
+          token: ${{ secrets.PRIVATE_DATA_TOKEN }}
+          path: private-storage
 
-      - name: Collect CoinGlass taker ratios
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Validate collector
+        run: python -m py_compile fetch_coinglass_taker.py
+
+      - name: Prepare private Taker storage
+        run: |
+          mkdir -p private-storage/coinglass/taker
+
+      - name: Collect Taker data privately
+        working-directory: private-storage/coinglass/taker
         env:
           COINGLASS_API_KEY: ${{ secrets.COINGLASS_API_KEY }}
-        run: python3 fetch_coinglass_taker.py
-
-      - name: Persist taker research records
-        shell: bash
         run: |
-          set -euo pipefail
+          python "$GITHUB_WORKSPACE/fetch_coinglass_taker.py" > "$RUNNER_TEMP/cg_taker.log" 2>&1
+          echo "Taker collection completed"
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Validate private Taker records
+        working-directory: private-storage/coinglass/taker
+        run: |
+          python - <<'PY'
+          import json
+          import time
+          from pathlib import Path
 
-          files=(
-            coinglass_taker_latest.json
-            coinglass_taker_history.jsonl
+          data = json.loads(
+              Path("coinglass_taker_latest.json").read_text()
           )
 
-          for file in "${files[@]}"; do
-            if [ -f "$file" ]; then
-              git add "$file"
-            fi
-          done
+          assert data["asset"] == "ETH"
+          assert data["api_range"] == "4h"
+          assert data["window_type"] == "rolling_4h"
+
+          for exchange in ("All", "Binance", "OKX"):
+              row = data["data"][exchange]
+              buy = float(row["buy_pct"])
+              sell = float(row["sell_pct"])
+
+              assert 0 <= buy <= 100
+              assert 0 <= sell <= 100
+              assert abs(buy + sell - 100) < 1
+
+          age = int(time.time() * 1000) - data["collected_at_ms"]
+
+          assert 0 <= age <= 300000
+
+          print("Private Taker validation passed")
+          PY
+
+      - name: Save Taker to private repository
+        working-directory: private-storage
+        run: |
+          git config user.name "Observer Ladder"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add coinglass/taker/
 
           if git diff --cached --quiet; then
-            echo "No new taker observations"
+            echo "No new records"
             exit 0
           fi
 
-          git commit -m "Record CoinGlass ETH taker observation"
+          git commit -m "Update private CoinGlass ETH Taker"
 
-          pushed=false
-
-          for attempt in $(seq 1 12); do
-            echo "Push attempt $attempt"
-
-            git fetch origin main
-
-            if ! git rebase origin/main; then
-              git rebase --abort || true
-              echo "Rebase conflict; stopping safely"
-              exit 1
+          for attempt in 1 2 3 4 5; do
+            if git pull --rebase origin main && git push origin HEAD:main; then
+              echo "Private Taker storage successful"
+              exit 0
             fi
 
-            if git push origin HEAD:main; then
-              pushed=true
-              break
-            fi
-
-            sleep 2
+            git rebase --abort 2>/dev/null || true
+            sleep 3
           done
 
-          if [ "$pushed" != true ]; then
-            echo "Unable to save CoinGlass taker records"
-            exit 1
-          fi
+          exit 1
 
-          echo "CoinGlass taker records saved"
+      - name: Clean temporary logs
+        if: always()
+        run: rm -f "$RUNNER_TEMP/cg_taker.log"
