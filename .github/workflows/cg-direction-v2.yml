@@ -1,19 +1,10 @@
 name: CG-Direction V2 Independent Shadow
 
-# Isolated V2 research. No live trading or Telegram.
 on:
   workflow_dispatch:
 
-  workflow_run:
-    workflows: ["Update OKX ETH Price"]
-    types: [completed]
-    branches: [main]
-
-  schedule:
-    - cron: "1-56/5 * * * *"
-
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: cg-direction-v2-independent
@@ -21,193 +12,208 @@ concurrency:
 
 jobs:
   research:
-    if: >-
-      github.event_name != 'workflow_run' ||
-      github.event.workflow_run.conclusion == 'success'
-
+    if: vars.CG_STORAGE_AUTHORIZED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
     steps:
-      - name: Checkout latest main
+      - name: Checkout public research code
         uses: actions/checkout@v4
         with:
           ref: main
-          persist-credentials: true
+          persist-credentials: false
+
+      - name: Checkout private storage
+        uses: actions/checkout@v4
+        with:
+          repository: zhaodi617-web/observer-ladder-private-data
+          token: ${{ secrets.PRIVATE_DATA_TOKEN }}
+          path: private-storage
 
       - name: Validate Python syntax
         run: python3 -m py_compile cg_direction_v2.py
 
-      - name: Run independent V2 safety tests
-        shell: bash
+      - name: Prepare private V2 workspace
         run: |
-          set -euo pipefail
           python3 - <<'PY'
-          import tempfile
+          import json
+          import shutil
           from pathlib import Path
+
+          root = Path(".")
+          private = root / "private-storage"
+          work = private / "models" / "cg_v2"
+          work.mkdir(parents=True, exist_ok=True)
+
+          names = [
+              "cg_direction_v2_activation.json",
+              "cg_direction_v2_predictions.jsonl",
+              "cg_direction_v2_verifications.jsonl",
+              "cg_direction_v2_latest.json",
+              "cg_direction_v2_summary.json"
+          ]
+
+          for name in names:
+              source = root / name
+              target = work / name
+
+              if source.exists() and not target.exists():
+                  shutil.copy2(source, target)
+
+          inputs = [
+              "okx_latest.json",
+              "okx_candles.json",
+              "cg_direction_v1_predictions.jsonl",
+              "cg_direction_v1_verifications.jsonl"
+          ]
+
+          for name in inputs:
+              source = root / name
+              if source.exists():
+                  shutil.copy2(source, work / name)
+
+          for metric in ("oi", "taker"):
+              name = f"coinglass_{metric}_history.jsonl"
+              source = private / "coinglass" / metric / name
+              assert source.exists()
+
+              records = {}
+
+              for path in (root / name, source):
+                  if not path.exists():
+                      continue
+                  for line in path.read_text().splitlines():
+                      if not line.strip():
+                          continue
+                      row = json.loads(line)
+                      timestamp = int(row["collected_at_ms"])
+                      if timestamp in records:
+                          assert records[timestamp] == row
+                      records[timestamp] = row
+
+              assert records
+
+              target = work / name
+              target.write_text(
+                  "".join(
+                      json.dumps(records[t]) + "\n"
+                      for t in sorted(records)
+                  ),
+                  encoding="utf-8"
+              )
+
+          print("Private V2 workspace ready")
+          PY
+
+      - name: Run V2 safety checks
+        run: |
+          python3 - <<'PY'
           import cg_direction_v2 as m
 
           now = 1800000000000
-
-          history = [
-              {'collected_at_ms': now - 1000},
-              {'collected_at_ms': now + 1000},
+          rows = [
+              {"collected_at_ms": now - 1000},
+              {"collected_at_ms": now + 1000}
           ]
-          selected = m.latest_asof(history, now, 60000)
-          assert selected['collected_at_ms'] == now - 1000
 
-          bars = []
-          for i in range(10):
-              bars.append({
-                  'time': now - (10 - i) * m.M15,
-                  'open': '100',
-                  'high': '101',
-                  'low': '99',
-                  'close': '100',
-                  'volume_usdt': '100',
-                  'confirmed': True,
-              })
+          assert m.latest_asof(
+              rows, now, 60000
+          )["collected_at_ms"] == now - 1000
 
-          source = {
-              'exchange': 'OKX',
-              'symbol': 'ETH-USDT-SWAP',
-              'candles_15m': bars + [{
-                  'time': now,
-                  'confirmed': False,
-                  'close': '100',
-              }],
-          }
-          assert len(m.confirmed_m15(source, now)) == 10
+          assert m.latest_asof(
+              rows, now - 100000, 60000
+          ) is None
 
-          taker_up = {
-              'data': {
-                  'All': {'buy_pct': 52},
-                  'Binance': {'buy_pct': 51},
-                  'OKX': {'buy_pct': 51},
-              }
-          }
-          oi = {
-              'data': {
-                  'All': {
-                      'open_interest_change_percent_1h': 0.5
-                  }
-              }
-          }
-          bars[-1]['close'] = '103'
-          bars[-1]['volume_usdt'] = '150'
-          score, votes, features, signal = (
-              m.score_from_features(taker_up, oi, 1.0, bars, now)
-          )
-          assert signal == 'CG_V2_UP'
-          assert votes['oi_price_confirmation'] == 1
+          assert m.VERSION == "cg_direction_v2_shadow_1.1"
 
-          taker_down = {
-              'data': {
-                  'All': {'buy_pct': 48},
-                  'Binance': {'buy_pct': 49},
-                  'OKX': {'buy_pct': 49},
-              }
-          }
-          bars[-1]['close'] = '97'
-          score, votes, features, signal = (
-              m.score_from_features(taker_down, oi, -1.0, bars, now)
-          )
-          assert signal == 'CG_V2_DOWN'
-
-          pred = {
-              'model': m.VERSION,
-              'prediction_time_ms': now - m.HOUR - 600000,
-              'target_time_ms': now - 600000,
-              'signal': 'CG_V2_UP',
-              'reference_price': 100,
-          }
-          endpoint = {
-              'time': now - 300000 - m.M15,
-              'close': '101',
-              'confirmed': True,
-          }
-          with tempfile.TemporaryDirectory() as d:
-              old_path = m.VERIFY
-              try:
-                  m.VERIFY = Path(d) / 'results.jsonl'
-                  first = m.verify([pred], [], [endpoint], now)
-                  assert len(first) == 1
-                  assert first[0]['result'] == 'HIT'
-                  second = m.verify([pred], first, [endpoint], now)
-                  assert len(second) == 0
-              finally:
-                  m.VERIFY = old_path
-
-          print('V2 safety tests passed')
+          print("V2 time alignment checks passed")
           PY
 
-      - name: Generate and verify V2 shadow predictions
-        run: python3 cg_direction_v2.py
-
-      - name: Persist V2-only research files
-        shell: bash
+      - name: Run private V2 research
+        working-directory: private-storage/models/cg_v2
         run: |
-          set -euo pipefail
+          python3 "$GITHUB_WORKSPACE/cg_direction_v2.py" > "$RUNNER_TEMP/cg_v2.log" 2>&1
+          echo "Private V2 research completed"
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Validate V2 research records
+        working-directory: private-storage/models/cg_v2
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
 
-          files=(
-            cg_direction_v2_activation.json
-            cg_direction_v2_predictions.jsonl
-            cg_direction_v2_verifications.jsonl
-            cg_direction_v2_latest.json
+          summary = json.loads(
+              Path("cg_direction_v2_summary.json").read_text()
           )
 
-          for file in "${files[@]}"; do
+          assert summary["rule_version"] == "1.1"
+
+          for name in (
+              "cg_direction_v2_predictions.jsonl",
+              "cg_direction_v2_verifications.jsonl"
+          ):
+              path = Path(name)
+              if not path.exists():
+                  continue
+
+              rows = [
+                  json.loads(line)
+                  for line in path.read_text().splitlines()
+                  if line.strip()
+              ]
+
+              ids = [
+                  int(row["prediction_time_ms"])
+                  for row in rows
+              ]
+
+              assert len(ids) == len(set(ids))
+
+          print("V2 research validation passed")
+          PY
+
+      - name: Save private V2 research
+        working-directory: private-storage
+        run: |
+          git config user.name "Observer Ladder"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          for name in activation.json predictions.jsonl verifications.jsonl latest.json summary.json; do
+            file="models/cg_v2/cg_direction_v2_$name"
+
             if [ -f "$file" ]; then
               git add "$file"
             fi
           done
 
-          # No new predictions or verifications:
-          # do not commit the refreshed summary alone.
           if git diff --cached --quiet; then
-            echo "No new V2 research; no commit"
+            echo "No new V2 research records"
             exit 0
           fi
 
-          if [ -f cg_direction_v2_summary.json ]; then
-            git add cg_direction_v2_summary.json
-          fi
+          git commit -m "Update private CG V2 research"
 
-          git commit -m "Record isolated CG-Direction V2 research"
-
-          pushed=false
-
-          for attempt in $(seq 1 12); do
-            git fetch origin main
-
-            if ! git rebase origin/main; then
-              git rebase --abort || true
-              echo "Conflict detected; stopping without overwrite"
-              exit 1
+          for attempt in 1 2 3 4 5; do
+            if git pull --rebase origin main && git push origin HEAD:main; then
+              echo "Private V2 storage successful"
+              exit 0
             fi
 
-            if git push origin HEAD:main; then
-              pushed=true
-              break
-            fi
-
-            sleep 2
+            git rebase --abort 2>/dev/null || true
+            sleep 3
           done
 
-          if [ "$pushed" != true ]; then
-            echo "V2 persistence failed; no silent overwrite"
-            exit 1
-          fi
+          exit 1
 
-      - name: Confirm research-only mode
+      - name: Clean temporary research inputs
+        if: always()
         run: |
-          echo "CG V2 research completed"
-          echo "Five-minute schedule enabled"
-          echo "OKX workflow trigger enabled"
-          echo "At most one V2 prediction per UTC hour"
-          echo "Original model files untouched"
-          echo "No Telegram messages"
-          echo "No live orders"
+          work="private-storage/models/cg_v2"
+
+          rm -f "$work/okx_latest.json"
+          rm -f "$work/okx_candles.json"
+          rm -f "$work/coinglass_oi_history.jsonl"
+          rm -f "$work/coinglass_taker_history.jsonl"
+          rm -f "$work/cg_direction_v1_predictions.jsonl"
+          rm -f "$work/cg_direction_v1_verifications.jsonl"
+          rm -f "$RUNNER_TEMP/cg_v2.log"
