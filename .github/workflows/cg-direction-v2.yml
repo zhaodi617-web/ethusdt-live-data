@@ -31,7 +31,10 @@ jobs:
           path: private-storage
 
       - name: Validate Python syntax
-        run: python3 -m py_compile cg_direction_v2.py
+        run: |
+          python3 -m py_compile cg_direction_v2.py
+          python3 -m py_compile cg_direction_v2_rules.py
+          python3 -m py_compile cg_direction_v2_runner.py
 
       - name: Prepare private V2 workspace
         run: |
@@ -75,6 +78,7 @@ jobs:
           for metric in ("oi", "taker"):
               name = f"coinglass_{metric}_history.jsonl"
               source = private / "coinglass" / metric / name
+
               assert source.exists()
 
               records = {}
@@ -82,18 +86,23 @@ jobs:
               for path in (root / name, source):
                   if not path.exists():
                       continue
+
                   for line in path.read_text().splitlines():
                       if not line.strip():
                           continue
+
                       row = json.loads(line)
                       timestamp = int(row["collected_at_ms"])
+
                       if timestamp in records:
                           assert records[timestamp] == row
+
                       records[timestamp] = row
 
               assert records
 
               target = work / name
+
               target.write_text(
                   "".join(
                       json.dumps(records[t]) + "\n"
@@ -105,34 +114,101 @@ jobs:
           print("Private V2 workspace ready")
           PY
 
+      - name: Connect private advanced features
+        run: |
+          test -f private-storage/coinglass/features_latest.json
+
+          cp private-storage/coinglass/features_latest.json \
+             private-storage/models/cg_v2/coinglass_features_latest.json
+
+          echo "Advanced features connected"
+
       - name: Run V2 safety checks
         run: |
           python3 - <<'PY'
-          import cg_direction_v2 as m
+          import cg_direction_v2 as core
+          import cg_direction_v2_rules as rules
+          import cg_direction_v2_runner as runner
 
           now = 1800000000000
+
           rows = [
               {"collected_at_ms": now - 1000},
               {"collected_at_ms": now + 1000}
           ]
 
-          assert m.latest_asof(
+          assert core.latest_asof(
               rows, now, 60000
           )["collected_at_ms"] == now - 1000
 
-          assert m.latest_asof(
+          assert core.latest_asof(
               rows, now - 100000, 60000
           ) is None
 
-          assert m.VERSION == "cg_direction_v2_shadow_1.1"
+          assert core.VERSION == "cg_direction_v2_shadow_1.1"
+          assert rules.RULE_VERSION == "1.2"
 
-          print("V2 time alignment checks passed")
+          runner.safety_tests()
+
+          print("CG V2 safety checks passed")
+          PY
+
+      - name: Check private input freshness
+        working-directory: private-storage/models/cg_v2
+        run: |
+          python3 - <<'PY'
+          import json
+          import time
+          from pathlib import Path
+
+          now = int(time.time() * 1000)
+
+          advanced = json.loads(
+              Path("coinglass_features_latest.json").read_text()
+          )
+
+          age = now - int(
+              advanced["source_collected_at_ms"]
+          )
+
+          assert advanced["symbol"] == "ETH"
+          assert advanced["feature_version"] == "1.0"
+          assert 0 <= age <= 1200000
+
+          for metric in ("oi", "taker"):
+              path = Path(
+                  f"coinglass_{metric}_history.jsonl"
+              )
+
+              rows = [
+                  json.loads(line)
+                  for line in path.read_text().splitlines()
+                  if line.strip()
+              ]
+
+              eligible = [
+                  int(row["collected_at_ms"])
+                  for row in rows
+                  if int(row["collected_at_ms"]) <= now
+              ]
+
+              assert eligible
+
+              if now - max(eligible) <= 1200000:
+                  print(f"{metric}: FRESH")
+              else:
+                  print(f"{metric}: STALE - directional signal unavailable")
+
+          print("Advanced input freshness passed")
           PY
 
       - name: Run private V2 research
         working-directory: private-storage/models/cg_v2
+        env:
+          CG_V2_RULE: "1.2"
         run: |
-          python3 "$GITHUB_WORKSPACE/cg_direction_v2.py" > "$RUNNER_TEMP/cg_v2.log" 2>&1
+          python3 "$GITHUB_WORKSPACE/cg_direction_v2_runner.py" > "$RUNNER_TEMP/cg_v2.log" 2>&1
+
           echo "Private V2 research completed"
 
       - name: Validate V2 research records
@@ -146,13 +222,33 @@ jobs:
               Path("cg_direction_v2_summary.json").read_text()
           )
 
-          assert summary["rule_version"] == "1.1"
+          assert summary["rule_version"] == "1.2"
+          assert summary["model"] == "cg_direction_v2_shadow_1.2"
+
+          assert summary["simulation_only"] is True
+          assert summary["live_order_allowed"] is False
+          assert summary["telegram_enabled"] is False
+
+          versions = summary["history_by_rule_version"]
+
+          assert set(versions) == {"1.0", "1.1", "1.2"}
+
+          assert sum(
+              v["predictions_total"]
+              for v in versions.values()
+          ) == summary["all_versions_predictions_total"]
+
+          assert sum(
+              v["verified_total"]
+              for v in versions.values()
+          ) == summary["all_versions_verified_total"]
 
           for name in (
               "cg_direction_v2_predictions.jsonl",
               "cg_direction_v2_verifications.jsonl"
           ):
               path = Path(name)
+
               if not path.exists():
                   continue
 
@@ -170,6 +266,10 @@ jobs:
               assert len(ids) == len(set(ids))
 
           print("V2 research validation passed")
+          print("Rule versions separated")
+          print("New predictions:", summary["new_predictions"])
+          print("New verifications:", summary["new_verifications"])
+          print("Rule 1.2 predictions:", versions["1.2"]["predictions_total"])
           PY
 
       - name: Save private V2 research
@@ -191,7 +291,7 @@ jobs:
             exit 0
           fi
 
-          git commit -m "Update private CG V2 research"
+          git commit -m "Update private CG V2 rule 1.2 research"
 
           for attempt in 1 2 3 4 5; do
             if git pull --rebase origin main && git push origin HEAD:main; then
@@ -214,6 +314,7 @@ jobs:
           rm -f "$work/okx_candles.json"
           rm -f "$work/coinglass_oi_history.jsonl"
           rm -f "$work/coinglass_taker_history.jsonl"
+          rm -f "$work/coinglass_features_latest.json"
           rm -f "$work/cg_direction_v1_predictions.jsonl"
           rm -f "$work/cg_direction_v1_verifications.jsonl"
           rm -f "$RUNNER_TEMP/cg_v2.log"
