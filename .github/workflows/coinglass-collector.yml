@@ -1,19 +1,10 @@
 name: CoinGlass ETH OI Collector
 
 on:
-  workflow_run:
-    workflows:
-      - Update OKX ETH Price
-    types:
-      - completed
-    branches:
-      - main
-  schedule:
-    - cron: "2-59/5 * * * *"
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: coinglass-eth-oi-collector
@@ -21,77 +12,94 @@ concurrency:
 
 jobs:
   collect:
-    if: >-
-      github.event_name != 'workflow_run' ||
-      github.event.workflow_run.conclusion == 'success'
+    if: vars.CG_STORAGE_AUTHORIZED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
     steps:
-      - name: Checkout latest main
+      - name: Checkout public research code
         uses: actions/checkout@v4
         with:
-          ref: main
-          persist-credentials: true
+          persist-credentials: false
 
-      - name: Validate collector syntax
-        run: python3 -m py_compile fetch_coinglass.py
+      - name: Checkout private storage
+        uses: actions/checkout@v4
+        with:
+          repository: zhaodi617-web/observer-ladder-private-data
+          token: ${{ secrets.PRIVATE_DATA_TOKEN }}
+          path: private-storage
 
-      - name: Collect ETH OI from CoinGlass
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Validate collector
+        run: python -m py_compile fetch_coinglass.py
+
+      - name: Prepare private OI storage
+        run: |
+          mkdir -p private-storage/coinglass/oi
+
+      - name: Collect OI privately
+        working-directory: private-storage/coinglass/oi
         env:
           COINGLASS_API_KEY: ${{ secrets.COINGLASS_API_KEY }}
-        run: python3 fetch_coinglass.py
-
-      - name: Persist CoinGlass OI records
-        shell: bash
         run: |
-          set -euo pipefail
+          python "$GITHUB_WORKSPACE/fetch_coinglass.py" > "$RUNNER_TEMP/cg_oi.log" 2>&1
+          echo "OI collection completed"
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Validate private OI records
+        working-directory: private-storage/coinglass/oi
+        run: |
+          python - <<'PY'
+          import json
+          import time
+          from pathlib import Path
 
-          files=(
-            coinglass_oi_latest.json
-            coinglass_oi_history.jsonl
+          data = json.loads(
+              Path("coinglass_oi_latest.json").read_text()
           )
 
-          for file in "${files[@]}"; do
-            if [ -f "$file" ]; then
-              git add "$file"
-            fi
-          done
+          assert data["asset"] == "ETH"
+
+          for exchange in ("All", "Binance", "OKX"):
+              assert data["data"][exchange]["open_interest_usd"] > 0
+
+          age = int(time.time() * 1000) - data["collected_at_ms"]
+
+          assert 0 <= age <= 300000
+
+          print("Private OI validation passed")
+          PY
+
+      - name: Save OI to private repository
+        working-directory: private-storage
+        run: |
+          git config user.name "Observer Ladder"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add coinglass/oi/
 
           if git diff --cached --quiet; then
-            echo "No new CoinGlass records"
+            echo "No new records"
             exit 0
           fi
 
-          git commit -m "Record CoinGlass ETH OI observation"
+          git commit -m "Update private CoinGlass ETH OI"
 
-          pushed=false
-
-          for attempt in $(seq 1 12); do
-            echo "Push attempt $attempt"
-
-            git fetch origin main
-
-            if ! git rebase origin/main; then
-              echo "Commit conflict; stopping safely"
-              git rebase --abort || true
-              exit 1
+          for attempt in 1 2 3 4 5; do
+            if git pull --rebase origin main && git push origin HEAD:main; then
+              echo "Private OI storage successful"
+              exit 0
             fi
 
-            if git push origin HEAD:main; then
-              pushed=true
-              break
-            fi
-
-            sleep 2
+            git rebase --abort 2>/dev/null || true
+            sleep 3
           done
 
-          if [ "$pushed" != true ]; then
-            echo "Failed to persist CoinGlass records"
-            exit 1
-          fi
+          exit 1
 
-          echo "CoinGlass OI records saved"
+      - name: Clean temporary logs
+        if: always()
+        run: rm -f "$RUNNER_TEMP/cg_oi.log"
