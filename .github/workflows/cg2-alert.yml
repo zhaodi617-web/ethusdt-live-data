@@ -1,0 +1,261 @@
+name: CG2 Research Telegram
+
+on:
+  workflow_run:
+    workflows: ["CG-Direction V2 Independent Shadow"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      test_message:
+        description: "Send CG2 connection test"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cg2-research-telegram
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  notify:
+    if: >-
+      vars.CG_STORAGE_AUTHORIZED == 'true' &&
+      (github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: zhaodi617-web/observer-ladder-private-data
+          ref: main
+          token: ${{ secrets.PRIVATE_DATA_TOKEN }}
+          path: private-storage
+      - name: CG2 research alerts and verification
+        env:
+          CG_TELEGRAM_BOT_TOKEN: ${{ secrets.CG_TELEGRAM_BOT_TOKEN }}
+          CG_TELEGRAM_CHAT_ID: ${{ secrets.CG_TELEGRAM_CHAT_ID }}
+          TEST_MESSAGE: ${{ github.event_name == 'workflow_dispatch' && inputs.test_message }}
+        run: |
+          python3 - <<'PY'
+          import json, math, os, time
+          from pathlib import Path
+          from datetime import datetime, timezone
+          from cg_direction_telegram import send_message
+
+          VERSION = 'cg2_alert_1.0'
+          M15, M30, HOUR = 900000, 1800000, 3600000
+          NOW = int(time.time()*1000)
+          root = Path('private-storage')
+          source = root/'models/cg_v2/cg_direction_v2_observations.jsonl'
+          path = root/'research/cg2_alert/state.json'
+          valid = {'BUY_FLOW_CONFIRMATION','SELL_FLOW_CONFIRMATION',
+                   'COUNTEREVIDENCE_GATE','INSUFFICIENT_FLOW_CONFIRMATION'}
+
+          def read(p):
+              return [json.loads(s) for s in p.read_text().splitlines() if s.strip()]
+
+          def num(x):
+              try:
+                  n = float(x)
+                  return n if math.isfinite(n) else 0
+              except (ValueError,TypeError,OverflowError):
+                  return 0
+
+          def sign(x):
+              return (x>0)-(x<0)
+
+          def classify(c):
+              if c.get('rule_version')!='1.2' or c.get('reason') not in valid:
+                  return 'INVALID',0
+              direction = {'CG_V2_UP':1,'CG_V2_DOWN':-1}.get(c.get('signal'),0)
+              if direction:
+                  return 'CONFIRMED',direction
+              if c.get('signal')!='UNCERTAIN':
+                  return 'INVALID',0
+              a,f=c.get('advanced_features',{}),c.get('features',{})
+              spot=num(a.get('spot_imbalance'))
+              change=num(a.get('spot_imbalance_change'))
+              future=num(a.get('futures_imbalance'))
+              p15=num(f.get('price_return_15m_pct'))
+              d=sign(spot)
+              if (a.get('futures_imbalance') is not None and
+                  abs(spot)>=.05 and abs(change)>=.03 and
+                  sign(change)==d==sign(p15) and sign(future)!=-d):
+                  return 'EARLY',d
+              return 'NEUTRAL',0
+
+          sample={'rule_version':'1.2','reason':'COUNTEREVIDENCE_GATE',
+                  'signal':'UNCERTAIN','advanced_features':{'spot_imbalance':-.1,
+                  'spot_imbalance_change':-.04,'futures_imbalance':-.01},
+                  'features':{'price_return_15m_pct':-.2}}
+          assert classify(sample)==('EARLY',-1)
+          assert classify({**sample,'reason':'INVALID_CVD_INPUT'})==('INVALID',0)
+          assert classify({**sample,'signal':'CG_V2_UP'})==('CONFIRMED',1)
+          assert classify({**sample,'advanced_features':{**sample['advanced_features'],
+                           'futures_imbalance':.1}})==('NEUTRAL',0)
+
+          def stamp(t):
+              return datetime.fromtimestamp(t/1000,timezone.utc).strftime('%m-%d %H:%M UTC')
+
+          def label(d):
+              return '偏上涨' if d==1 else '偏下跌'
+
+          state=json.loads(path.read_text()) if path.exists() else dict(
+              version=VERSION,activated_at_ms=NOW,last_observed=0,
+              last_direction=0,last_level='',neutral_count=0,events=[])
+          assert state['version']==VERSION
+          assert state['activated_at_ms']<=NOW
+          assert len({e['id'] for e in state['events']})==len(state['events'])
+          path.parent.mkdir(parents=True,exist_ok=True)
+
+          def save():
+              tmp=path.with_suffix('.tmp')
+              tmp.write_text(json.dumps(state,ensure_ascii=False,indent=2)+'\n')
+              tmp.replace(path)
+
+          assert source.exists()
+          observations=read(source)
+          assert observations
+          row=max(observations,key=lambda r:r['observed_at_ms'])
+          t=int(row['observed_at_ms'])
+          c=row['candidate']
+          calc=int(c['prediction_time_ms'])
+          target=int(c['target_time_ms'])
+          market=int(c.get('reference_market_time_ms') or 0)
+          a=c.get('advanced_features',{})
+          period=int(a.get('cvd_period_start_ms') or 0)
+          collected=int(a.get('source_collected_at_ms') or 0)
+          level,d=classify(c)
+          fresh=(state['activated_at_ms']<=calc<=t<=NOW and
+                 NOW-t<=600000 and target==calc+HOUR and NOW<target and
+                 0<market<=calc and calc-market<=600000 and
+                 0<period and period+M30<=collected<=calc and
+                 calc-collected<=1200000 and num(c.get('reference_price'))>0 and
+                 row.get('model_inputs_usable') is True and
+                 row.get('simulation_only') is True)
+
+          if fresh and level!='INVALID' and t>state['last_observed']:
+              if level=='NEUTRAL':
+                  state['neutral_count']+=1
+                  if state['neutral_count']>=2:
+                      state['last_direction']=0
+                      state['last_level']=''
+              else:
+                  state['neutral_count']=0
+                  changed=(d!=state['last_direction'] or
+                           (level=='CONFIRMED' and state['last_level']!='CONFIRMED'))
+                  key=f'{period}:{d}:{level}'
+                  if changed and not any(e['id']==key for e in state['events']):
+                      state['events'].append(dict(id=key,observed_at_ms=t,
+                          target_time_ms=target,price=num(c['reference_price']),
+                          direction=d,level=level,formal=bool(row.get('formal_prediction_written')),
+                          delivery='PENDING',result=None,result_delivery='PENDING'))
+                  if changed:
+                      state['last_direction']=d
+                      state['last_level']=level
+              state['last_observed']=t
+          save()
+
+          data=json.loads(Path('okx_candles.json').read_text())
+          assert data['exchange']=='OKX' and data['symbol']=='ETH-USDT-SWAP'
+          bars={}
+          for b in read(Path('v3_archive_15m.jsonl'))+data['candles_15m']:
+              end=int(b['time'])+M15
+              price=num(b['close'])
+              if b.get('confirmed') is not True or end>NOW or price<=0:
+                  continue
+              if end in bars:
+                  assert bars[end]==price
+              bars[end]=price
+          errors=0
+          if os.environ.get('TEST_MESSAGE','').lower()=='true':
+              send_message('【Observer Ladder｜CG2 系统测试】\n通知连接正常。此消息不是预测。')
+              print('CG2 test message accepted')
+          for e in state['events']:
+              if e['delivery']=='PENDING':
+                  if NOW-e['observed_at_ms']>600000 or NOW>=e['target_time_ms']:
+                      e['delivery']='EXPIRED'
+                  else:
+                      title='方向预警' if e['level']=='EARLY' else '规则确认'
+                      detail=('现货资金流加速，价格同向，合约资金流未反向。原规则尚未确认。'
+                              if e['level']=='EARLY' else
+                              ('原CG2正式预测通过。' if e['formal'] else '动态观察通过原规则，非每小时正式预测。'))
+                      msg='\n'.join([f'【Observer Ladder｜CG2 {title}】',
+                          '编号：CG2-'+str(e['observed_at_ms']),
+                          '方向：'+label(e['direction']),
+                          f"参考价：{e['price']:.2f} USDT（OKX）",
+                          '观察：'+stamp(e['observed_at_ms']),
+                          '目标：'+stamp(e['target_time_ms']),detail,
+                          '实验性研究信号；不是交易指令。'])
+                      try:
+                          send_message(msg)
+                          e['delivery']='SENT'
+                          e['sent_at_ms']=NOW
+                      except Exception:
+                          errors+=1
+                  save()
+              target=e['target_time_ms']
+              if e['result'] is None and NOW>=target+M15:
+                  ends=[end for end in bars if target<=end<target+M15]
+                  if ends:
+                      end=min(ends)
+                      change=bars[end]/e['price']-1
+                      e.update(result='FLAT' if abs(change)<=.0005 else
+                               ('HIT' if change*e['direction']>0 else 'MISS'),
+                               result_price=bars[end],result_time_ms=end,
+                               verified_at_ms=NOW,change_pct=change*100)
+                      save()
+              if e['result'] and e['delivery']=='SENT' and e['result_delivery']=='PENDING':
+                  if NOW-e['verified_at_ms']>1800000:
+                      e['result_delivery']='EXPIRED'
+                  else:
+                      try:
+                          send_message('\n'.join(['【Observer Ladder｜CG2 核验】',
+                              '编号：CG2-'+str(e['observed_at_ms']),
+                              '结果：'+e['result'],
+                              f"核验价：{e['result_price']:.2f} USDT",
+                              f"价格变化：{e['change_pct']:+.3f}%",
+                              '仅核验方向，不代表交易收益。']))
+                          e['result_delivery']='SENT'
+                      except Exception:
+                          errors+=1
+                  save()
+          print('CG2 current level:',level,'Fresh:',fresh)
+          print('Research events:',len(state['events']))
+          print('Sent:',sum(e['delivery']=='SENT' for e in state['events']))
+          print('Verified:',sum(e['result'] is not None for e in state['events']))
+          if errors:
+              raise RuntimeError('CG2 notification delivery failed')
+          PY
+      - name: Save private CG2 alert state only
+        if: always()
+        working-directory: private-storage
+        shell: bash
+        run: |
+          set -euo pipefail
+          file=research/cg2_alert/state.json
+          if [ ! -f "$file" ]; then exit 0; fi
+          git config user.name "Observer Ladder"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- "$file"
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Save isolated CG2 research alert state"
+          for attempt in 1 2 3 4 5; do
+            git fetch origin main
+            if ! git rebase origin/main; then
+              git rebase --abort || true
+              exit 1
+            fi
+            if git push origin HEAD:main; then exit 0; fi
+            sleep 3
+          done
+          exit 1
