@@ -1,0 +1,372 @@
+name: Observer Time Constraint Verification
+
+on:
+  workflow_run:
+    workflows: ["CG-Direction V2 Independent Shadow"]
+    types: [completed]
+    branches: [main]
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: observer-time-constraint-verification
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  verify:
+    if: >-
+      vars.CG_STORAGE_AUTHORIZED == 'true' &&
+      (github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success')
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout research code
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Checkout private storage
+        uses: actions/checkout@v4
+        with:
+          repository: zhaodi617-web/observer-ladder-private-data
+          ref: main
+          token: ${{ secrets.PRIVATE_DATA_TOKEN }}
+          path: private-storage
+
+      - name: Validate verification program
+        run: |
+          python3 -m py_compile time_constraint_verify.py
+
+          python3 - <<'PY'
+          import time_constraint_verify as v
+
+          assert v.outcome(
+              "EARLY_UP", 100, 101
+          ) == "HIT"
+
+          assert v.outcome(
+              "EARLY_DOWN", 100, 101
+          ) == "MISS"
+
+          assert v.outcome(
+              "CG_V2_DOWN", 100, 99
+          ) == "HIT"
+
+          assert v.outcome(
+              "CG_V2_UP", 100, 100
+          ) == "FLAT"
+
+          assert v.outcome(
+              "UNCERTAIN", 100, 101
+          ) == "ABSTAIN"
+
+          assert v.classify(
+              "WITHDRAW_CANDIDATE",
+              "MISS",
+              "ABSTAIN"
+          ) == "VALID_WITHDRAWAL"
+
+          assert v.classify(
+              "WITHDRAW_CANDIDATE",
+              "HIT",
+              "ABSTAIN"
+          ) == "FALSE_WITHDRAWAL"
+
+          assert v.classify(
+              "REVERSAL_CANDIDATE",
+              "MISS",
+              "HIT"
+          ) == "VALID_REVERSAL"
+
+          bars = [{
+              "time": 900000,
+              "close": 101,
+              "confirmed": True
+          }]
+
+          assert v.endpoint(
+              bars, 1700000, 1750000
+          ) is None
+
+          assert v.endpoint(
+              bars, 1700000, 1800000
+          ) == (1800000, 101.0)
+
+          print("Verification safety tests passed")
+          PY
+
+      - name: Prepare isolated verification workspace
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import shutil
+          from pathlib import Path
+
+          root = Path(".")
+          private = root / "private-storage"
+
+          work = (
+              Path(os.environ["RUNNER_TEMP"])
+              / "time_constraint"
+          )
+
+          work.mkdir(
+              parents=True,
+              exist_ok=True
+          )
+
+          data = json.loads(
+              (root / "okx_candles.json").read_text()
+          )
+
+          assert data["exchange"] == "OKX"
+          assert data["symbol"] == "ETH-USDT-SWAP"
+
+          archive = root / "v3_archive_15m.jsonl"
+
+          assert archive.exists()
+
+          bars = {}
+
+          def add_bar(row):
+              if row.get("confirmed") is not True:
+                  return
+
+              timestamp = int(row["time"])
+
+              if timestamp in bars:
+                  assert float(
+                      bars[timestamp]["close"]
+                  ) == float(row["close"])
+
+              bars[timestamp] = row
+
+          for line in archive.read_text().splitlines():
+              if line.strip():
+                  add_bar(json.loads(line))
+
+          for row in data["candles_15m"]:
+              add_bar(row)
+
+          data["candles_15m"] = [
+              bars[t] for t in sorted(bars)
+          ]
+
+          for model in ("v1", "cg2"):
+              folder = work / model
+
+              folder.mkdir(
+                  parents=True,
+                  exist_ok=True
+              )
+
+              if model == "v1":
+                  source = root
+
+                  inputs = [
+                      "v1_lifecycle_observations.jsonl",
+                      "observer_early_predictions.jsonl"
+                  ]
+
+              else:
+                  source = (
+                      private / "models" / "cg_v2"
+                  )
+
+                  inputs = [
+                      "cg_direction_v2_observations.jsonl",
+                      "cg_direction_v2_predictions.jsonl"
+                  ]
+
+              for name in inputs:
+                  assert (source / name).exists()
+
+                  shutil.copy2(
+                      source / name,
+                      folder / name
+                  )
+
+              (folder / "okx_candles.json").write_text(
+                  json.dumps(data),
+                  encoding="utf-8"
+              )
+
+              previous = (
+                  private
+                  / "research"
+                  / "time_constraint"
+                  / model
+              )
+
+              name = (
+                  f"{model}_time_constraint_results.jsonl"
+              )
+
+              if (previous / name).exists():
+                  shutil.copy2(
+                      previous / name,
+                      folder / name
+                  )
+
+          print("Independent workspace ready")
+          PY
+
+      - name: Run independent verification
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          for model in v1 cg2; do
+            (
+              cd "$RUNNER_TEMP/time_constraint/$model"
+
+              python3 \
+                "$GITHUB_WORKSPACE/time_constraint_verify.py" \
+                "$model"
+            ) > "$RUNNER_TEMP/time_constraint_$model.log" 2>&1 || {
+              echo "::error::Independent verification failed"
+              exit 1
+            }
+
+            echo "$model verification completed"
+          done
+
+      - name: Preserve previous results and save new records
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import shutil
+          from pathlib import Path
+
+          work = (
+              Path(os.environ["RUNNER_TEMP"])
+              / "time_constraint"
+          )
+
+          private = Path("private-storage")
+
+          for model in ("v1", "cg2"):
+              source = work / model
+
+              target = (
+                  private
+                  / "research"
+                  / "time_constraint"
+                  / model
+              )
+
+              target.mkdir(
+                  parents=True,
+                  exist_ok=True
+              )
+
+              result_name = (
+                  f"{model}_time_constraint_results.jsonl"
+              )
+
+              summary_name = (
+                  f"{model}_time_constraint_summary.json"
+              )
+
+              old = target / result_name
+              new = source / result_name
+
+              if old.exists():
+                  assert new.exists()
+
+                  assert new.read_bytes().startswith(
+                      old.read_bytes()
+                  )
+
+              summary = json.loads(
+                  (source / summary_name).read_text()
+              )
+
+              assert summary["model"] == model
+              assert summary["simulation_only"] is True
+
+              for name in (
+                  result_name,
+                  summary_name
+              ):
+                  if (source / name).exists():
+                      shutil.copy2(
+                          source / name,
+                          target / name
+                      )
+
+              print(
+                  model,
+                  "Observations:",
+                  summary["observations_total"]
+              )
+
+              print(
+                  model,
+                  "Verified events:",
+                  summary["verified_events"]
+              )
+
+              print(
+                  model,
+                  "Pending events:",
+                  summary["pending_events"]
+              )
+
+          print("Original research records preserved")
+          PY
+
+      - name: Commit private verification results
+        working-directory: private-storage
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "Observer Ladder"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          for model in v1 cg2; do
+            for suffix in results.jsonl summary.json; do
+              file="research/time_constraint/$model/${model}_time_constraint_$suffix"
+
+              if [ -f "$file" ]; then
+                git add -- "$file"
+              fi
+            done
+          done
+
+          if git diff --cached --quiet; then
+            echo "No new verification results"
+            exit 0
+          fi
+
+          git commit -m "Update independent time constraint verification"
+
+          for attempt in 1 2 3 4 5; do
+            git fetch origin main
+
+            if ! git rebase origin/main; then
+              git rebase --abort || true
+              echo "Conflict detected; no records overwritten"
+              exit 1
+            fi
+
+            if git push origin HEAD:main; then
+              echo "Private verification storage successful"
+              exit 0
+            fi
+
+            sleep 3
+          done
+
+          exit 1
