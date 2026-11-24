@@ -1,7 +1,7 @@
 {
   "exchange": "OKX",
   "symbol": "ETH-USDT-SWAP",
-  "collected_at": "2026-11-24T13:50:50.729001+00:00",
+  "collected_at": "2026-11-24T13:55:52.019646+00:00",
   "candles_15m": [
     {
       "time": 1795438800000,
@@ -1096,11 +1096,11 @@
       "time": 1795527900000,
       "open": "1694.65",
       "high": "1695.49",
-      "low": "1691.4",
-      "close": "1692.56",
-      "volume_contracts": "66058.12",
-      "volume_eth": "6605.812",
-      "volume_usdt": "11185682.47269",
+      "low": "1691",
+      "close": "1691.31",
+      "volume_contracts": "108107.88",
+      "volume_eth": "10810.788",
+      "volume_usdt": "18302283.61101",
       "confirmed": false
     }
   ],
@@ -2199,10 +2199,10 @@
       "open": "1703.59",
       "high": "1705.59",
       "low": "1679.02",
-      "close": "1692.56",
-      "volume_contracts": "2991137.37",
-      "volume_eth": "299113.737",
-      "volume_usdt": "505638383.54515",
+      "close": "1691.2",
+      "volume_contracts": "3033086.84",
+      "volume_eth": "303308.684",
+      "volume_usdt": "512738022.83282",
       "confirmed": false
     }
   ]
