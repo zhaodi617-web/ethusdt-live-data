@@ -15,7 +15,7 @@ concurrency:
 jobs:
   collect:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
       - name: Checkout repository
@@ -28,9 +28,10 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Check collector syntax
+      - name: Check Python syntax
         run: |
           python -m py_compile fetch_coinglass_advanced.py
+          python -m py_compile coinglass_advanced_features.py
 
       - name: Collect advanced CoinGlass data
         env:
@@ -44,20 +45,24 @@ jobs:
           import json
           from pathlib import Path
 
-          p = Path("coinglass_advanced_latest.json")
-          data = json.loads(p.read_text())
+          data = json.loads(
+              Path("coinglass_advanced_latest.json").read_text()
+          )
 
-          print("Status:", data["status"])
+          print("Collection:", data["status"])
           print("Successful:", data["successful_endpoints"])
           print("Total:", data["total_endpoints"])
-
-          for name, item in data["data"].items():
-              print(name, item["status"])
 
           assert data["successful_endpoints"] > 0
           PY
 
-      - name: Save advanced data
+      - name: Generate CG research features
+        id: features
+        continue-on-error: true
+        run: |
+          python coinglass_advanced_features.py
+
+      - name: Save advanced data and features
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -65,16 +70,21 @@ jobs:
           git add coinglass_advanced_latest.json
           git add coinglass_advanced_history.jsonl
 
+          if [ "${{ steps.features.outcome }}" = "success" ]; then
+            git add coinglass_features_latest.json
+            git add coinglass_features_history.jsonl
+          fi
+
           if git diff --cached --quiet; then
             echo "No changes"
             exit 0
           fi
 
-          git commit -m "Update CoinGlass advanced data"
+          git commit -m "Update CoinGlass advanced data and features"
 
           for attempt in 1 2 3 4 5; do
             if git pull --rebase origin main && git push origin HEAD:main; then
-              echo "Advanced data saved"
+              echo "CG data and features saved"
               exit 0
             fi
 
@@ -83,4 +93,10 @@ jobs:
           done
 
           echo "Unable to save data"
+          exit 1
+
+      - name: Check feature generation result
+        if: steps.features.outcome == 'failure'
+        run: |
+          echo "Raw data saved but feature generation failed"
           exit 1
