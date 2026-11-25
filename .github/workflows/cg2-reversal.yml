@@ -1,0 +1,185 @@
+name: CG2 Reversal Research
+
+on:
+  workflow_run:
+    workflows: ["CG-Direction V2 Independent Shadow"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cg2-reversal-research
+  cancel-in-progress: false
+
+jobs:
+  research:
+    if: >-
+      vars.CG_STORAGE_AUTHORIZED == 'true' &&
+      (github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: zhaodi617-web/observer-ladder-private-data
+          ref: main
+          token: ${{ secrets.PRIVATE_DATA_TOKEN }}
+          path: private-storage
+      - name: Observe and verify reversals
+        env:
+          CG_TELEGRAM_BOT_TOKEN: ${{ secrets.CG_TELEGRAM_BOT_TOKEN }}
+          CG_TELEGRAM_CHAT_ID: ${{ secrets.CG_TELEGRAM_CHAT_ID }}
+        run: |
+          python3 - <<'PY'
+          import json, math, time
+          from pathlib import Path
+          from cg_direction_telegram import send_message
+
+          now = int(time.time()*1000)
+          M15, M30 = 900000, 1800000
+          root = Path('private-storage')
+          path = root/'research/cg2_reversal/state.json'
+          source = root/'models/cg_v2/cg_direction_v2_observations.jsonl'
+          version = 'cg2_reversal_1.0'
+          def read(p):
+              return [json.loads(s) for s in p.read_text().splitlines() if s.strip()]
+          def finite(x):
+              return isinstance(x,(int,float)) and not isinstance(x,bool) and math.isfinite(x)
+          def valid(r):
+              c = r.get('candidate',{})
+              a = c.get('advanced_features',{})
+              t,o = c.get('prediction_time_ms'),r.get('observed_at_ms')
+              period,col = a.get('cvd_period_start_ms'),a.get('source_collected_at_ms')
+              market = c.get('reference_market_time_ms')
+              values = [t,o,period,col,market,c.get('reference_price')]+[a.get(k) for k in ('spot_imbalance','spot_imbalance_change','futures_imbalance','liquidation_intensity')]
+              return (r.get('model_inputs_usable') is True and r.get('simulation_only') is True and
+                      c.get('rule_version')=='1.2' and all(finite(x) for x in values) and
+                      0<market<=t<=o<=now and t-market<=600000 and c['reference_price']>0 and
+                      0<period and period+M30<=col<=t and t-col<=1200000)
+          def direction(old,a):
+              if not old['liquidation_intensity']>=3>a['liquidation_intensity']:
+                  return 0
+              for d in (1,-1):
+                  if (old['spot_imbalance']*d<=-.05 and a['spot_imbalance']*d>=0 and
+                      a['spot_imbalance_change']*d>=.10 and a['futures_imbalance']*d>=.05):
+                      return d
+              return 0
+          assert direction(dict(spot_imbalance=-.17,liquidation_intensity=25),dict(spot_imbalance=.017,spot_imbalance_change=.187,futures_imbalance=.09,liquidation_intensity=.53))==1
+          assert direction(dict(spot_imbalance=.17,liquidation_intensity=25),dict(spot_imbalance=-.017,spot_imbalance_change=-.187,futures_imbalance=-.09,liquidation_intensity=.53))==-1
+          assert direction(dict(spot_imbalance=-.17,liquidation_intensity=2),dict(spot_imbalance=.017,spot_imbalance_change=.187,futures_imbalance=.09,liquidation_intensity=.53))==0
+          state = json.loads(path.read_text()) if path.exists() else dict(version=version,activated_at_ms=now,last_period=0,events=[])
+          assert state['version']==version and state['activated_at_ms']<=now
+          assert len({e['id'] for e in state['events']})==len(state['events'])
+          def save():
+              path.parent.mkdir(parents=True,exist_ok=True)
+              tmp=path.with_suffix('.tmp')
+              tmp.write_text(json.dumps(state,ensure_ascii=False,indent=2)+'\n')
+              tmp.replace(path)
+          periods={}
+          for r in sorted(read(source),key=lambda r:r['observed_at_ms']):
+              if valid(r):
+                  periods.setdefault(r['candidate']['advanced_features']['cvd_period_start_ms'],r)
+          if periods:
+              period=max(periods)
+              c=periods[period]['candidate']
+              a=c['advanced_features']
+              t=c['prediction_time_ms']
+              if period>state['last_period']:
+                  state['last_period']=period
+                  previous=periods.get(period-M30)
+                  if previous and state['activated_at_ms']<=t<=now and now-t<=600000:
+                      old=previous['candidate']['advanced_features']
+                      d=direction(old,a)
+                      if d:
+                          state['events'].append(dict(id=f'{period}:{d}',time=t,price=c['reference_price'],direction=d,spot_before=old['spot_imbalance'],spot=a['spot_imbalance'],futures=a['futures_imbalance'],liquidation_before=old['liquidation_intensity'],liquidation=a['liquidation_intensity'],original_signal=c['signal'],original_score=c['score'],blockers=c.get('counterevidence',[]),source_timestamp_verified=False,delivery='PENDING',results={},result_delivery={}))
+          save()
+          data=json.loads(Path('okx_candles.json').read_text())
+          assert data['exchange']=='OKX' and data['symbol']=='ETH-USDT-SWAP'
+          bars={}
+          for b in read(Path('v3_archive_15m.jsonl'))+data['candles_15m']:
+              end=int(b['time'])+M15
+              price=float(b['close'])
+              if b.get('confirmed') is not True or end>now or not finite(price) or price<=0:
+                  continue
+              if end in bars:
+                  assert bars[end]==price
+              bars[end]=price
+          errors=0
+          for e in state['events']:
+              if e['delivery']=='PENDING':
+                  if now-e['time']>600000:
+                      e['delivery']='EXPIRED'
+                  else:
+                      label='潜在上涨反转' if e['direction']==1 else '潜在下跌反转'
+                      msg='\n'.join(['【Observer Ladder｜CG2 REVERSAL】','编号：REV-'+e['id'],'方向：'+label,f"参考价：{e['price']:.2f} USDT（OKX）",f"现货失衡：{e['spot_before']:+.2%} → {e['spot']:+.2%}",f"合约失衡：{e['futures']:+.2%}",f"清算冲击：{e['liquidation_before']:.2f} → {e['liquidation']:.2f}倍",'主核验15分钟，另记录30/60分钟。目标后首个确认15分钟收盘，可能延后不足15分钟。','实验性反转倾向，非交易指令。'])
+                      try:
+                          send_message(msg)
+                          e['delivery']='SENT'
+                          e['sent_at_ms']=now
+                      except Exception:
+                          errors+=1
+                  save()
+              for m in (15,30,60):
+                  k=str(m)
+                  target=e['time']+m*60000
+                  if k not in e['results'] and now>=target+M15:
+                      ends=[end for end in bars if target<=end<target+M15]
+                      if ends:
+                          end=min(ends)
+                          change=bars[end]/e['price']-1
+                          e['results'][k]=dict(outcome='FLAT' if abs(change)<=.0005 else ('HIT' if change*e['direction']>0 else 'MISS'),price=bars[end],endpoint_ms=end,target_ms=target,change_pct=change*100,verified_at_ms=now)
+                          save()
+                  r=e['results'].get(k)
+                  if r and e['delivery']=='SENT' and k not in e['result_delivery']:
+                      if now-r['verified_at_ms']>1800000:
+                          e['result_delivery'][k]='EXPIRED'
+                      else:
+                          try:
+                              send_message('\n'.join(['【Observer Ladder｜CG2 REVERSAL 核验】','编号：REV-'+e['id'],f'期限：{m}分钟（目标后首个确认15分钟收盘）','结果：'+r['outcome'],f"核验价：{r['price']:.2f}",f"变化：{r['change_pct']:+.3f}%",'仅方向研究。']))
+                              e['result_delivery'][k]='SENT'
+                          except Exception:
+                              errors+=1
+                      save()
+          state['summary']={}
+          for m in (15,30,60):
+              k=str(m)
+              results=[e['results'][k]['outcome'] for e in state['events'] if k in e['results']]
+              h,miss=results.count('HIT'),results.count('MISS')
+              state['summary'][k]=dict(hits=h,misses=miss,flats=results.count('FLAT'),pending=len(state['events'])-len(results),hit_rate=h/(h+miss) if h+miss else None)
+          state['updated_at_ms']=now
+          save()
+          print('CG2 REVERSAL',len(state['events']),state['summary'])
+          if errors:
+              raise RuntimeError('Reversal Telegram delivery failed')
+          PY
+      - name: Save only isolated reversal state
+        if: always()
+        working-directory: private-storage
+        shell: bash
+        run: |
+          set -euo pipefail
+          file=research/cg2_reversal/state.json
+          if [ ! -f "$file" ]; then exit 0; fi
+          git config user.name "Observer Ladder"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- "$file"
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Save isolated CG2 reversal state"
+          for attempt in 1 2 3 4 5; do
+            git fetch origin main
+            if ! git rebase origin/main; then
+              git rebase --abort || true
+              exit 1
+            fi
+            if git push origin HEAD:main; then exit 0; fi
+            sleep 3
+          done
+          exit 1
