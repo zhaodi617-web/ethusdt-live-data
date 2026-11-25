@@ -66,7 +66,7 @@ jobs:
           import subprocess
           import urllib.parse
           import urllib.request
-          from datetime import datetime, timezone
+          from datetime import datetime, timedelta, timezone
 
           diff = subprocess.run(
               [
@@ -115,13 +115,13 @@ jobs:
 
                   prediction_time = datetime.fromtimestamp(
                       r['prediction_time'] / 1000,
-                      timezone.utc
-                  ).strftime('%Y-%m-%d %H:%M:%S UTC')
+                      timezone(timedelta(hours=6, minutes=30))
+                  ).strftime('%Y-%m-%d %H:%M:%S') + ' (UTC+06:30)'
 
                   verification_time = datetime.fromtimestamp(
                       r['verification_time'] / 1000,
-                      timezone.utc
-                  ).strftime('%Y-%m-%d %H:%M:%S UTC')
+                      timezone(timedelta(hours=6, minutes=30))
+                  ).strftime('%Y-%m-%d %H:%M:%S') + ' (UTC+06:30)'
 
                   result_label = labels.get(
                       r['result'],
@@ -133,8 +133,14 @@ jobs:
                       r['signal']
                   )
 
+                  title = {
+                      'HIT': '✅【V1｜命中 HIT】',
+                      'MISS': '❌【V1｜失败 MISS】',
+                      'FLAT': '⚪【V1｜平局 FLAT】'
+                  }[r['result']]
+
                   message = (
-                      '【Observer Ladder ETH｜预测验证】\n\n'
+                      f'{title}\n\n'
                       f"预测编号：{prediction_id}\n"
                       f"预测时间：{prediction_time}\n"
                       f"验证时间：{verification_time}\n"
