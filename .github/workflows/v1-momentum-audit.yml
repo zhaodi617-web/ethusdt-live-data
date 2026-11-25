@@ -1,0 +1,206 @@
+name: Observer V1 Momentum Audit
+
+on:
+  workflow_run:
+    workflows: ["Update OKX ETH Price"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: observer-v1-momentum-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Record and verify isolated prospective audit
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, time
+          from pathlib import Path
+
+          VERSION = "v1_momentum_audit_1.0"
+          RULE = "1.0_restored_2026_11_24"
+          M, H, SLOT = 900000, 3600000, 300000
+          FILE = Path("research/v1_momentum_audit/state.json")
+          now = int(time.time()*1000)
+
+          def load(p):
+              return json.loads(Path(p).read_text())
+
+          def rows(p):
+              return [json.loads(s) for s in Path(p).read_text().splitlines() if s.strip()]
+
+          def vote(x):
+              return 1 if x > .0005 else -1 if x < -.0005 else 0
+
+          def direction(s):
+              return 1 if s >= 2 else -1 if s <= -2 else 0
+
+          def scores(long, short, hour, oi, vol):
+              def bonus(x):
+                  return (1 if x > 0 else -1 if x < 0 else 0) if oi is not None and oi > .002 and vol > 1 else 0
+              return [vote(long)+vote(hour)+bonus(long),
+                      vote(short)+vote(hour)+bonus(short),
+                      vote(hour)+bonus(hour)]
+
+          assert scores(-.002,.008,-.002,None,.9) == [-2,0,-1]
+          assert scores(.003,.001,.003,.003,1.2) == [3,3,2]
+          assert scores(-.003,-.001,-.003,.003,1.2) == [-3,-3,-2]
+          assert scores(.0005,-.0005,0,None,1) == [0,0,0]
+
+          def result(d, r):
+              return "ABSTAIN" if d == 0 else "FLAT" if abs(r) <= .0005 else "HIT" if d*r > 0 else "MISS"
+
+          def summarize(rr):
+              valid = [r for r in rr if "return" in r]
+              out = {}
+              for i, name in enumerate(("A","B","C")):
+                  n = dict.fromkeys(("HIT","MISS","FLAT","ABSTAIN"),0)
+                  big = missed = 0
+                  for r in valid:
+                      v = result(r["directions"][i], r["return"])
+                      n[v] += 1
+                      if abs(r["return"]) >= .005:
+                          big += 1
+                          missed += v != "HIT"
+                  d = n["HIT"]+n["MISS"]
+                  out[name] = dict(n, hit_rate=n["HIT"]/d if d else None,
+                                   coverage=(len(valid)-n["ABSTAIN"])/len(valid) if valid else None,
+                                   large_moves=big, large_not_hit=missed)
+              for i,name in ((1,"B_only"),(2,"C_only")):
+                  events = [r for r in valid if r["directions"][0]==0 and r["directions"][i]!=0]
+                  first = {}
+                  for r in events:
+                      key=(r["anchor"] if r["anchor"] is not None else r["time"]//H,r["directions"][i])
+                      first.setdefault(key,r)
+                  out[name] = {"observations":len(events),"first_per_anchor_direction":len(first),
+                               "outcomes":{s:sum(result(r["directions"][i],r["return"])==s for r in first.values()) for s in ("HIT","MISS","FLAT")}}
+              return {"observations":len(rr),"verified":len(valid),
+                      "pending":sum("return" not in r and not r.get("missing_endpoint") for r in rr),
+                      "missing":sum(bool(r.get("missing_endpoint")) for r in rr),"groups":out}
+
+          if FILE.exists():
+              state = load(FILE)
+              if state["version"] != VERSION:
+                  raise RuntimeError("Unexpected audit version")
+          else:
+              state = {"version":VERSION,"activated_at":now,"capture_until":now+7*24*H,
+                       "simulation_only":True,"telegram_enabled":False,"live_order_allowed":False,
+                       "rows":[],"last_seen":None,"skips":{}}
+
+          before = json.dumps(state,sort_keys=True) if FILE.exists() else None
+          data = load("okx_candles.json")
+          if data.get("exchange")!="OKX" or data.get("symbol")!="ETH-USDT-SWAP":
+              raise RuntimeError("Wrong market")
+          def closes(candles,span):
+              return {int(c["time"])+span:float(c["close"]) for c in candles
+                      if c.get("confirmed") is True and int(c["time"])+span<=now}
+          m = closes(data["candles_15m"],M)
+          h = closes(data["candles_1h"],H)
+          obs = rows("v1_lifecycle_observations.jsonl")[-1]
+          p = obs["candidate"]
+          t = int(obs["observed_at_ms"])
+
+          def capture():
+              if not state["activated_at"]<=t<state["capture_until"]:
+                  return "outside_capture"
+              if not 0<=now-t<=600000:
+                  return "stale_observation"
+              if not obs.get("timestamps_valid") or obs.get("simulation_only") is not True or p.get("rule_version")!=RULE:
+                  return "invalid_source"
+              if p.get("exchange")!="OKX" or p.get("symbol")!="ETH-USDT-SWAP" or p.get("prediction_time")!=t or p.get("target_time")!=t+H:
+                  return "invalid_identity"
+              if not 0<=t-int(obs["ticker_time_ms"])<=900000:
+                  return "stale_quote"
+              l,q = int(obs["last_15m_close_ms"]),int(obs["last_1h_close_ms"])
+              if not (0<=t-l<M and 0<=t-q<H):
+                  return "stale_candles"
+              if any(obs.get(k) is not None and int(obs[k])>t for k in ("oi_time_ms","previous_oi_time_ms")):
+                  return "future_oi"
+              if any(k not in m for k in (l,l-M,l-H)) or any(k not in h for k in (q,q-H)):
+                  return "missing_inputs"
+              if min(m[l],m[l-M],m[l-H],h[q],h[q-H],float(p["reference_price"]))<=0:
+                  return "invalid_price"
+              long,short,hour = m[l]/m[l-H]-1,m[l]/m[l-M]-1,h[q]/h[q-H]-1
+              if abs(long-float(p["momentum_15m"]))>1e-9 or abs(hour-float(p["momentum_1h"]))>1e-9:
+                  return "replay_input_mismatch"
+              s = scores(long,short,hour,p.get("oi_change"),p["volume_ratio"])
+              d = list(map(direction,s))
+              if s[0]!=p["score"] or {1:"EARLY_UP",-1:"EARLY_DOWN",0:"UNCERTAIN"}[d[0]]!=p["signal"]:
+                  return "replay_score_mismatch"
+              if any(r["time"]//SLOT==t//SLOT for r in state["rows"]):
+                  return "duplicate_slot"
+              state["rows"].append({"time":t,"captured_at":now,"target":t+H,"price":p["reference_price"],
+                                    "anchor":obs.get("anchor_prediction_time_ms"),
+                                    "formal":obs.get("formal_prediction_written") is True,
+                                    "last_15m":l,"last_1h":q,"ticker_time":obs["ticker_time_ms"],
+                                    "oi_time":obs.get("oi_time_ms"),"previous_oi_time":obs.get("previous_oi_time_ms"),
+                                    "long":long,"short":short,"hour":hour,"oi":p.get("oi_change"),
+                                    "volume":p["volume_ratio"],"scores":s,"directions":d})
+              return "captured"
+
+          if t>=state["activated_at"] and t<state["capture_until"] and (state["last_seen"] is None or t>state["last_seen"]):
+              status = capture()
+              state["last_seen"] = t
+              if status!="captured":
+                  state["skips"][status]=state["skips"].get(status,0)+1
+              print("Capture:",status)
+          for r in state["rows"]:
+              if "return" in r or r.get("missing_endpoint"):
+                  continue
+              target = ((r["target"]+M-1)//M)*M
+              if target in m:
+                  r["endpoint_time"]=target
+                  r["endpoint_price"]=m[target]
+                  r["return"]=m[target]/r["price"]-1
+                  r["verified_at"]=now
+              elif now>=target+24*H:
+                  r["missing_endpoint"]=True
+
+          if before != json.dumps(state,sort_keys=True):
+              rr=state["rows"]
+              spaced=[]
+              next_time=0
+              for r in rr:
+                  if "return" in r and r["time"]>=next_time:
+                      spaced.append(r)
+                      next_time=r["endpoint_time"]
+              state["summary"]={"all":summarize(rr),"formal":summarize([r for r in rr if r["formal"]]),
+                                "nonoverlap":summarize(spaced),
+                                "uncaptured_slots_between_records":sum(max(0,b["time"]//SLOT-a["time"]//SLOT-1) for a,b in zip(rr,rr[1:])),
+                                "warning":"Prospective research only. Overlapping windows correlated. Coverage is observed, not scheduled. No execution or PnL."}
+              FILE.parent.mkdir(parents=True,exist_ok=True)
+              FILE.write_text(json.dumps(state,separators=(",",":"),allow_nan=False)+"\n")
+          print("Audit observations:",len(state["rows"]),"activation:",state["activated_at"])
+          PY
+      - name: Save audit state only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add research/v1_momentum_audit/state.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Record isolated V1 momentum audit"
+          for attempt in $(seq 1 12); do
+            git fetch origin main
+            if ! git rebase origin/main; then
+              git rebase --abort || true
+              exit 1
+            fi
+            if git push origin HEAD:main; then exit 0; fi
+            sleep 2
+          done
+          exit 1
