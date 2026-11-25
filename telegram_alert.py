@@ -4,7 +4,7 @@ import sys
 import time
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 LATEST = Path("observer_early_latest.json")
@@ -98,8 +98,8 @@ direction = (
 
 prediction_time = datetime.fromtimestamp(
     int(prediction_id) / 1000,
-    timezone.utc
-).strftime("%Y-%m-%d %H:%M:%S UTC")
+    timezone(timedelta(hours=6, minutes=30))
+).strftime("%Y-%m-%d %H:%M:%S") + " (UTC+06:30)"
 
 reasons = "、".join(
     chinese_reason(x)
@@ -111,8 +111,10 @@ counter = "、".join(
     for x in prediction.get("counterevidence", [])
 ) or "暂无记录"
 
+title = "🟢【V1｜上涨预警】" if signal == "EARLY_UP" else "🔴【V1｜下跌预警】"
+
 message = (
-    "【Observer Ladder ETH｜V1 大模型】\n\n"
+    f"{title}\n\n"
     f"预测编号：{prediction_id}\n"
     f"预测时间：{prediction_time}\n\n"
     f"预测方向：{direction}\n"
