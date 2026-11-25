@@ -1,13 +1,13 @@
 {
   "model": "observer_early_v1",
   "active_rule_version": "1.0_restored_2026_11_24",
-  "verified_directional_samples": 315,
+  "verified_directional_samples": 316,
   "hits": 151,
-  "misses": 164,
+  "misses": 165,
   "flats": 25,
   "abstains": 48,
-  "pending_or_unverified": 2,
-  "hit_rate_pct": 47.94,
+  "pending_or_unverified": 1,
+  "hit_rate_pct": 47.78,
   "history_by_rule_version": {
     "1.0_archived": {
       "hits": 139,
@@ -22,14 +22,14 @@
     },
     "1.0_restored_2026_11_24_active": {
       "hits": 12,
-      "misses": 9,
+      "misses": 10,
       "flats": 2,
       "abstains": 2,
-      "directional_samples": 21,
-      "hit_rate_pct": 57.14,
+      "directional_samples": 22,
+      "hit_rate_pct": 54.55,
       "predictions_total": 27,
-      "verified_total": 25,
-      "pending": 2
+      "verified_total": 26,
+      "pending": 1
     },
     "1.1_archived": {
       "hits": 0,
@@ -65,6 +65,6 @@
       "pending": 0
     }
   },
-  "updated_at_ms": 1795565452601,
+  "updated_at_ms": 1795565751782,
   "warning": "Research only; next confirmed 15m close after 60m target. No live fills or net PnL."
 }
