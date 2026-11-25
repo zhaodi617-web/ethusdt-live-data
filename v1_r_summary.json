@@ -1,10 +1,10 @@
 {
   "model": "observer_v1_r_shadow_v0",
   "rule_version": "1.1_long_horizon",
-  "evaluated_at_utc": "2026-11-25T17:11:13.778000+00:00",
+  "evaluated_at_utc": "2026-11-25T17:16:06.629000+00:00",
   "predictions_total": 348,
   "new_predictions": 0,
-  "new_verifications": 0,
+  "new_verifications": 3,
   "by_horizon": {
     "15": {
       "hits": 135,
@@ -21,11 +21,11 @@
       "direction_hit_rate_pct": 48.19
     },
     "45": {
-      "hits": 114,
+      "hits": 115,
       "misses": 143,
       "flats": 33,
       "abstains": 56,
-      "direction_hit_rate_pct": 44.36
+      "direction_hit_rate_pct": 44.57
     },
     "60": {
       "hits": 113,
@@ -35,17 +35,17 @@
       "direction_hit_rate_pct": 45.56
     },
     "120": {
-      "hits": 9,
+      "hits": 10,
       "misses": 15,
       "flats": 2,
       "abstains": 16,
-      "direction_hit_rate_pct": 37.5
+      "direction_hit_rate_pct": 40.0
     },
     "180": {
       "hits": 11,
       "misses": 18,
       "flats": 0,
-      "abstains": 12,
+      "abstains": 13,
       "direction_hit_rate_pct": 37.93
     }
   },
