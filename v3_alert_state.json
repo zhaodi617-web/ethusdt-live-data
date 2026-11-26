@@ -381,6 +381,15 @@
       "threshold": 1703.57,
       "trigger_quote_price": 1703.69,
       "trigger_quote_time": 1795687549366
+    },
+    "1795728600000": {
+      "created_ms": 1795729566852,
+      "id": "1795728600000",
+      "sent_ms": 1795729590225,
+      "signal_quote": 1707.19,
+      "status": "WATCH",
+      "structure_low": 1701.87,
+      "threshold": 1708.48
     }
   }
 }
