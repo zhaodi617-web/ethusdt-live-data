@@ -1,19 +1,10 @@
 {
-  "evaluated_at_utc": "2026-11-26T21:51:29.667000+00:00",
-  "market_quote": 1709.05,
-  "market_quote_time": 1795729852870,
+  "evaluated_at_utc": "2026-11-26T21:56:32.359000+00:00",
+  "market_quote": 1706.07,
+  "market_quote_time": 1795730152169,
   "new_alerts": [],
   "note": "No live trading and no verified fills or net P&L; sampled market observations only",
   "pending": 0,
   "total_candidates": 39,
-  "updates": [
-    {
-      "id": "1795728600000",
-      "net_pnl": null,
-      "status": "TRIGGER_OBSERVED",
-      "trigger_quote_price": 1709.05,
-      "trigger_quote_time": 1795729852870,
-      "warning": "Observed sampling cross, not a fill; OHLC cannot establish intra-bar execution"
-    }
-  ]
+  "updates": []
 }
