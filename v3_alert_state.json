@@ -359,11 +359,15 @@
     "1795651200000": {
       "created_ms": 1795652166519,
       "id": "1795651200000",
+      "net_pnl": null,
+      "real_fill_confirmed": false,
       "sent_ms": 1795652196483,
       "signal_quote": 1708.43,
-      "status": "WATCH",
+      "status": "TRIGGER_OBSERVED",
       "structure_low": 1679.32,
-      "threshold": 1696.48
+      "threshold": 1696.48,
+      "trigger_quote_price": 1698.34,
+      "trigger_quote_time": 1795655153328
     }
   }
 }
