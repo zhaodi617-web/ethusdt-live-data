@@ -1,15 +1,15 @@
 {
   "model": "v1_s_reversal_shadow_v0",
-  "updated_at_utc": "2026-11-26T09:21:04.146000+00:00",
+  "updated_at_utc": "2026-11-26T09:31:08.701000+00:00",
   "observations": 210,
   "reversal_candidates": 19,
   "new_predictions": 0,
-  "new_verifications": 0,
+  "new_verifications": 1,
   "results": {
     "15": {
       "hits": 8,
-      "misses": 10,
-      "hit_rate_pct": 44.44
+      "misses": 11,
+      "hit_rate_pct": 42.11
     },
     "60": {
       "hits": 7,
