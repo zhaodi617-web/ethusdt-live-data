@@ -1,6 +1,6 @@
 {
   "model": "observer_v1_r2_precision_gate_v0",
-  "generated_at_utc": "2026-11-27T13:26:20.820000+00:00",
+  "generated_at_utc": "2026-11-27T13:31:24.732000+00:00",
   "activated_at_utc": "2026-11-16T02:15:37.659000+00:00",
   "opportunities_recorded": 274,
   "predictions_selected": 177,
@@ -8,13 +8,13 @@
   "abstains": 69,
   "signal_coverage_pct": 64.6,
   "verified_selected_hit": 74,
-  "verified_selected_miss": 83,
+  "verified_selected_miss": 84,
   "verified_selected_flat": 19,
-  "directional_hit_rate_pct": 47.13,
+  "directional_hit_rate_pct": 46.84,
   "source_v1r_on_same_selected_opportunities_hit": 74,
-  "source_v1r_on_same_selected_opportunities_miss": 83,
-  "selected_pending": 1,
+  "source_v1r_on_same_selected_opportunities_miss": 84,
+  "selected_pending": 0,
   "new_predictions": 0,
-  "new_verifications": 0,
+  "new_verifications": 1,
   "warning": "Selection only: selected direction equals V1-R direction. This design cannot improve conditional accuracy versus V1-R on identical selected predictions; compare selected accuracy to V1-R full coverage and signal coverage. No net PnL."
 }
