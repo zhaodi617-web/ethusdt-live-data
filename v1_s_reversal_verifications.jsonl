@@ -45,3 +45,4 @@
 {"change_pct": -0.0282, "direction": "UP", "horizon": 15, "prediction_time_ms": 1795741268115, "reference_price": 1702.39, "result": "FLAT", "simulation_only": true, "verification_price": 1701.91, "verification_time_ms": 1795743000000}
 {"change_pct": 0.73837, "direction": "UP", "horizon": 60, "prediction_time_ms": 1795741268115, "reference_price": 1702.39, "result": "HIT", "simulation_only": true, "verification_price": 1714.96, "verification_time_ms": 1795745700000}
 {"change_pct": 0.31755, "direction": "DOWN", "horizon": 15, "prediction_time_ms": 1795748469694, "reference_price": 1722.56, "result": "MISS", "simulation_only": true, "verification_price": 1728.03, "verification_time_ms": 1795750200000}
+{"change_pct": 0.50506, "direction": "DOWN", "horizon": 60, "prediction_time_ms": 1795748469694, "reference_price": 1722.56, "result": "MISS", "simulation_only": true, "verification_price": 1731.26, "verification_time_ms": 1795752900000}
