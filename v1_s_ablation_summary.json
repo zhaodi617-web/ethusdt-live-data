@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-11-28T02:11:10.184000+00:00",
+  "generated_at_utc": "2026-11-28T02:16:05.155000+00:00",
   "activated_at_utc": "2026-11-17T05:05:56.136000+00:00",
   "version": "v0.0.1_predeclared",
   "variants": {
@@ -21,11 +21,11 @@
       "watch": 0,
       "abstains": 155,
       "hit": 46,
-      "miss": 56,
+      "miss": 57,
       "flat": 3,
-      "pending": 1,
+      "pending": 0,
       "coverage_pct": 40.61,
-      "direction_hit_rate_pct": 45.1
+      "direction_hit_rate_pct": 44.66
     },
     "S-C": {
       "opportunities": 261,
@@ -41,6 +41,6 @@
     }
   },
   "new_predictions": 0,
-  "new_verifications": 0,
+  "new_verifications": 3,
   "warning": "Research only. Uses legacy first confirmed 15m close >= 60m target; no fills or net PnL."
 }
